@@ -32,6 +32,9 @@ def get_db() -> Generator[Session, None, None]:
 
 def init_db() -> None:
     """Create the SQLite database and any models added in later phases."""
+    # Importing the model module registers all mapped tables with Base.metadata.
+    from app.database import models  # noqa: F401
+
     with engine.begin() as connection:
         # Opening the connection creates security.db when it does not exist.
         connection.execute(text("SELECT 1"))
