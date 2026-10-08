@@ -96,6 +96,10 @@ class AuthenticationTestCase(unittest.TestCase):
         self.assertEqual(claims["role"], "USER")
         self.assertEqual(set(claims), {"sub", "role", "exp"})
 
+    def test_login_schema_accepts_local_development_email_addresses(self) -> None:
+        credentials = LoginRequest(email="admin@biziq.local", password="AdminPassword123!")
+        self.assertEqual(credentials.email, "admin@biziq.local")
+
     def test_login_uses_generic_error_for_wrong_missing_and_inactive_users(self) -> None:
         response = self.register_default_user()
         attempts = [

@@ -2,17 +2,53 @@
 from datetime import datetime, timedelta, timezone
 from typing import Annotated
 from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 from app.api.dependencies import require_permission
 from app.database.database import get_db
 from app.database.models import User
-from app.schemas.security import SecurityAnalysisResponse, SecurityAnalysisRequest, SecurityAIResult
+from app.schemas.security import (
+    SecurityAnalysisRequest,
+    SecurityAnalysisResponse,
+    SecurityAIResult,
+    SecurityDashboardResponse,
+    SecurityValidationRequest,
+    SecurityValidationResponse,
+)
 from app.services.security_event_service import get_security_events
 from app.services.security_analyzer import analyze_security_events
 from app.services.groq_security_service import analyze_security_evidence
+from app.services.security_dashboard_service import get_security_dashboard
 from app.services.audit_service import record_event
+from app.services.request_security_service import validate_agent_request
 router=APIRouter(prefix="/api/v1/security",tags=["security"])
 DB=Annotated[Session,Depends(get_db)]
+
+
+@router.post("/validate-request", response_model=SecurityValidationResponse)
+def validate_request(payload: SecurityValidationRequest, db: DB) -> JSONResponse:
+    """Validate an end-user JWT and RBAC request before another agent processes it."""
+    decision = validate_agent_request(db, payload)
+    return JSONResponse(status_code=decision.status_code, content=decision.response.model_dump())
+
+@router.get("/dashboard", response_model=SecurityDashboardResponse)
+def security_dashboard(
+    db: DB,
+    _: Annotated[User, Depends(require_permission("VIEW_SECURITY_ANALYSIS"))],
+    start: datetime | None = None,
+    end: datetime | None = None,
+) -> SecurityDashboardResponse:
+    """Return aggregated security metrics, signals, and recent events for the dashboard."""
+    end = end or datetime.now(timezone.utc)
+    start = start or end - timedelta(hours=24)
+    if start.tzinfo is None:
+        start = start.replace(tzinfo=timezone.utc)
+    if end.tzinfo is None:
+        end = end.replace(tzinfo=timezone.utc)
+    if start > end:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="start must be before end.")
+    return get_security_dashboard(db, start, end)
+
 @router.get("/events/{user_id}",response_model=SecurityAnalysisResponse)
 def security_events(user_id:int,db:DB,_:Annotated[User,Depends(require_permission("VIEW_SECURITY_ANALYSIS"))],start:datetime|None=None,end:datetime|None=None):
     if db.get(User,user_id) is None: raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,detail="User not found.")
