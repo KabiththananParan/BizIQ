@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>BizIQ - Business Intelligence Assistant</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <div class="brand-mark">▥</div>
+      <div>
+        <h1>BizIQ</h1>
+        <span>Your Business Intelligence Assistant</span>
+      </div>
+    </div>
+    <div class="top-user">
+      <span class="bell">♧</span>
+      <span class="avatar">A</span>
+      <strong>Achini</strong>
+      <span>⌄</span>
+    </div>
+  </header>
+
+  <main class="page">
+    <section class="layout">
+      <div class="main-column">
+
+        <section class="card ask-card">
+          <div class="section-heading">
+            <div class="bot-icon">AI</div>
+            <div>
+              <h2>Ask BizIQ</h2>
+              <p>Ask your business question in natural language.</p>
+            </div>
+          </div>
+
+          <div id="editMode" class="edit-banner hidden">
+            <span>Editing existing question</span>
+            <button id="cancelEditBtn" type="button">Cancel</button>
+          </div>
+
+          <div class="ask-row">
+            <textarea id="questionInput" rows="2"
+              placeholder="e.g. What are the total sales in Colombo?"></textarea>
+            <button id="askBtn" class="primary-btn" type="button">➤ <span id="askBtnText">Ask BizIQ</span></button>
+          </div>
+
+          <div class="examples">
+            <span>Try an example:</span>
+            <button class="example-btn" type="button">Show me the total sales in Colombo</button>
+            <button class="example-btn" type="button">Show me the top 5 products by sales</button>
+            <button class="example-btn" type="button">Compare sales between Colombo and Kandy</button>
+          </div>
+
+          <div id="statusMessage" class="status"></div>
+        </section>
+
+        <section class="card">
+          <div class="section-title">
+            <h2>🔎 NLP Analysis</h2>
+            <span>Current question</span>
+          </div>
+
+          <div class="analysis-grid">
+            <div class="analysis-box">
+              <h3>Intent</h3>
+              <div id="intentValue" class="value-pill">—</div>
+            </div>
+
+            <div class="analysis-box">
+              <h3>Extracted Entities</h3>
+              <div id="entitiesValue" class="chips">—</div>
+            </div>
+
+            <div class="analysis-box">
+              <h3>Summary</h3>
+              <p id="summaryValue" class="analysis-text">—</p>
+            </div>
+
+            <div class="analysis-box structured-box">
+              <h3>Structured Query</h3>
+              <pre id="structuredValue">—</pre>
+            </div>
+          </div>
+        </section>
+
+        <section class="card response-card">
+          <div class="section-title">
+            <h2>🤖 BizIQ Response</h2>
+            <span>LLM Insight Agent</span>
+          </div>
+
+          <div id="llmResponse" class="llm-response empty-response">
+            Ask a question to see the LLM Insight Agent response here.
+          </div>
+
+          <div id="llmMeta" class="llm-meta hidden"></div>
+        </section>
+
+      </div>
+
+      <aside class="card recent-card">
+        <div class="section-title">
+          <h2>🕘 Recently Asked</h2>
+          <button id="refreshBtn" class="icon-btn" type="button" title="Refresh">↻</button>
+        </div>
+
+        <div class="search-box">
+          <span>⌕</span>
+          <input id="searchInput" type="text" placeholder="Search previous questions...">
+        </div>
+
+        <div id="recentList" class="recent-list">
+          <div class="loading">Loading questions...</div>
+        </div>
+
+        <div class="recent-footer">
+          Showing latest saved questions. Search to find older questions.
+        </div>
+      </aside>
+    </section>
+  </main>
+
+  <div id="menu" class="context-menu hidden">
+    <button id="menuEdit" type="button">✏ Edit</button>
+    <button id="menuDelete" type="button">🗑 Delete</button>
+  </div>
+
+  <div id="confirmModal" class="modal hidden">
+    <div class="modal-box">
+      <h3>Delete question?</h3>
+      <p id="deleteQuestionText"></p>
+      <div class="modal-actions">
+        <button id="cancelDeleteBtn" class="secondary-btn" type="button">Cancel</button>
+        <button id="confirmDeleteBtn" class="danger-btn" type="button">Delete</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="script.js"></script>
+</body>
+</html>
