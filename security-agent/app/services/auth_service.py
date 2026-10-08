@@ -7,6 +7,8 @@ from sqlalchemy.orm import Session
 from app.core.security import hash_password, verify_password
 from app.database.models import Role, User
 from app.schemas.auth import RegistrationRequest, UserResponse
+from app.services.audit_service import record_event
+from app.services.login_attempt_service import record_login_attempt
 
 DEFAULT_REGISTRATION_ROLE = "USER"
 
@@ -65,11 +67,16 @@ def register_user(db: Session, registration: RegistrationRequest) -> User:
     return user
 
 
-def authenticate_user(db: Session, email: str, password: str) -> User:
+def authenticate_user(db: Session, email: str, password: str, ip_address: str | None = None, user_agent: str | None = None) -> User:
     """Authenticate an active user without revealing whether an email exists."""
     user = db.scalar(select(User).where(User.email == email))
     if user is None or not verify_password(password, user.password_hash) or not user.is_active:
+        reason = "INACTIVE_ACCOUNT" if user is not None and not user.is_active else "INVALID_CREDENTIALS"
+        record_login_attempt(db, email, False, user.id if user else None, ip_address, user_agent, reason)
+        record_event(db, "LOGIN_FAILED", "FAILED", user.id if user else None, "/api/v1/auth/login", ip_address, user_agent, reason)
         raise InvalidCredentialsError("Invalid credentials.")
+    record_login_attempt(db, email, True, user.id, ip_address, user_agent)
+    record_event(db, "LOGIN_SUCCESS", "SUCCESS", user.id, "/api/v1/auth/login", ip_address, user_agent)
     return user
 
 

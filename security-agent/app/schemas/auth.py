@@ -15,7 +15,10 @@ class RegistrationRequest(BaseModel):
 class LoginRequest(BaseModel):
     """Credentials accepted by the login endpoint."""
 
-    email: EmailStr
+    # Login must also support development accounts such as ``admin@biziq.local``.
+    # ``EmailStr`` deliberately rejects reserved domains (including ``.local``),
+    # even though these addresses are valid identifiers in a local-only deployment.
+    email: str = Field(min_length=3, max_length=255, pattern=r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
     password: str = Field(min_length=1, max_length=72)
 
 
@@ -26,7 +29,8 @@ class UserResponse(BaseModel):
 
     id: int
     username: str
-    email: EmailStr
+    # See LoginRequest: development users may use a local-only email domain.
+    email: str = Field(min_length=3, max_length=255, pattern=r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
     full_name: str
     role: str
     is_active: bool

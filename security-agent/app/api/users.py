@@ -37,10 +37,10 @@ def not_found_response(error: UserNotFoundError) -> HTTPException:
 def create_managed_user(
     payload: UserCreateRequest,
     db: DatabaseSession,
-    _: Annotated[User, Depends(require_permission("CREATE_USERS"))],
+    current_user: Annotated[User, Depends(require_permission("CREATE_USERS"))],
 ) -> ManagedUserResponse:
     try:
-        return serialize_managed_user(create_user(db, payload))
+        return serialize_managed_user(create_user(db, payload, current_user.id))
     except UserConflictError as exc:
         raise conflict_response(exc) from exc
     except InvalidRoleError as exc:
@@ -72,10 +72,10 @@ def update_managed_user(
     user_id: int,
     payload: UserUpdateRequest,
     db: DatabaseSession,
-    _: Annotated[User, Depends(require_permission("UPDATE_USERS"))],
+    current_user: Annotated[User, Depends(require_permission("UPDATE_USERS"))],
 ) -> ManagedUserResponse:
     try:
-        return serialize_managed_user(update_user(db, user_id, payload))
+        return serialize_managed_user(update_user(db, user_id, payload, current_user.id, f"/api/v1/users/{user_id}"))
     except UserNotFoundError as exc:
         raise not_found_response(exc) from exc
     except UserConflictError as exc:
@@ -88,10 +88,10 @@ def update_managed_user(
 def delete_managed_user(
     user_id: int,
     db: DatabaseSession,
-    _: Annotated[User, Depends(require_permission("DELETE_USERS"))],
+    current_user: Annotated[User, Depends(require_permission("DELETE_USERS"))],
 ) -> Response:
     try:
-        delete_user(db, user_id)
+        delete_user(db, user_id, current_user.id, f"/api/v1/users/{user_id}")
     except UserNotFoundError as exc:
         raise not_found_response(exc) from exc
     return Response(status_code=status.HTTP_204_NO_CONTENT)
