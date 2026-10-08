@@ -2,7 +2,7 @@
 
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy.orm import Session
 
@@ -19,6 +19,7 @@ from app.services.auth_service import (
     register_user,
     serialize_user,
 )
+from app.services.audit_service import record_event
 
 router = APIRouter(prefix="/api/v1/auth", tags=["authentication"])
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/login")
@@ -42,6 +43,10 @@ def get_current_user(token: Annotated[str, Depends(oauth2_scheme)], db: Database
         user_id = int(payload["sub"])
         return get_active_user_by_id(db, user_id)
     except (KeyError, TypeError, ValueError, TokenValidationError):
+        try:
+            record_event(db, "INVALID_TOKEN", "FAILED", resource="/api/v1/auth/me")
+        except Exception:
+            db.rollback()
         raise credentials_exception()
 
 
@@ -55,10 +60,10 @@ def register(registration: RegistrationRequest, db: DatabaseSession) -> UserResp
 
 
 @router.post("/login", response_model=TokenResponse)
-def login(credentials: LoginRequest, db: DatabaseSession) -> TokenResponse:
+def login(credentials: LoginRequest, db: DatabaseSession, request: Request = None) -> TokenResponse:
     """Validate credentials and issue a time-limited bearer token."""
     try:
-        user = authenticate_user(db, str(credentials.email), credentials.password)
+        user = authenticate_user(db, str(credentials.email), credentials.password, request.client.host if request and request.client else None, request.headers.get("user-agent") if request else None)
     except InvalidCredentialsError as exc:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials.") from exc
 

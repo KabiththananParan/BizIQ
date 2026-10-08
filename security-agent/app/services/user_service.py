@@ -8,6 +8,7 @@ from app.core.security import hash_password
 from app.database.models import Role, User
 from app.schemas.user import ManagedUserResponse, UserCreateRequest, UserUpdateRequest
 from app.services.rbac_service import ROLE_NAMES
+from app.services.audit_service import record_event
 
 
 class UserNotFoundError(ValueError):
@@ -56,7 +57,7 @@ def _ensure_unique(db: Session, username: str | None, email: str | None, user_id
             raise UserConflictError("A user with this username or email already exists.")
 
 
-def create_user(db: Session, payload: UserCreateRequest) -> User:
+def create_user(db: Session, payload: UserCreateRequest, actor_id: int | None = None, resource: str | None = None) -> User:
     """Create a user with a valid existing role and a bcrypt password hash."""
     _ensure_unique(db, payload.username, str(payload.email))
     user = User(
@@ -73,6 +74,7 @@ def create_user(db: Session, payload: UserCreateRequest) -> User:
         db.rollback()
         raise UserConflictError("A user with this username or email already exists.") from exc
     db.refresh(user)
+    if actor_id is not None: record_event(db, "USER_CREATED", "SUCCESS", actor_id, resource or f"/api/v1/users/{user.id}")
     return user
 
 
@@ -89,12 +91,13 @@ def get_user(db: Session, user_id: int) -> User:
     return user
 
 
-def update_user(db: Session, user_id: int, payload: UserUpdateRequest) -> User:
+def update_user(db: Session, user_id: int, payload: UserUpdateRequest, actor_id: int | None = None, resource: str | None = None) -> User:
     """Update supplied safe fields, hashing a replacement password if provided."""
     user = get_user(db, user_id)
     changes = payload.model_dump(exclude_unset=True)
     _ensure_unique(db, changes.get("username"), str(changes["email"]) if "email" in changes else None, user.id)
 
+    role_changed = "role" in changes and changes["role"] != user.role.name
     if "role" in changes:
         user.role = _get_role(db, changes.pop("role"))
     if "password" in changes:
@@ -108,11 +111,15 @@ def update_user(db: Session, user_id: int, payload: UserUpdateRequest) -> User:
         db.rollback()
         raise UserConflictError("A user with this username or email already exists.") from exc
     db.refresh(user)
+    if actor_id is not None:
+        record_event(db, "USER_UPDATED", "SUCCESS", actor_id, resource or f"/api/v1/users/{user.id}")
+        if role_changed: record_event(db, "ROLE_CHANGED", "SUCCESS", actor_id, resource or f"/api/v1/users/{user.id}")
     return user
 
 
-def delete_user(db: Session, user_id: int) -> None:
+def delete_user(db: Session, user_id: int, actor_id: int | None = None, resource: str | None = None) -> None:
     """Delete an existing user."""
     user = get_user(db, user_id)
     db.delete(user)
     db.commit()
+    if actor_id is not None: record_event(db, "USER_DELETED", "SUCCESS", actor_id, resource or f"/api/v1/users/{user_id}")
