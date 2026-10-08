@@ -42,3 +42,15 @@ Expected response:
 - `GET /api/v1/auth/me` returns the safe profile for an active bearer-token user.
 
 Passwords are stored only as bcrypt hashes and are never included in API responses.
+
+## Development administrator
+
+There is no public administrator-registration endpoint. For local development,
+explicitly supply credentials and run the controlled CLI:
+
+```powershell
+$env:DEV_ADMIN_USERNAME = "local-admin"
+$env:DEV_ADMIN_EMAIL = "local-admin@example.com"
+$env:DEV_ADMIN_PASSWORD = "replace-with-a-strong-password"
+python -m app.cli.create_dev_admin
+```

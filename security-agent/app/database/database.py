@@ -39,3 +39,9 @@ def init_db() -> None:
         # Opening the connection creates security.db when it does not exist.
         connection.execute(text("SELECT 1"))
         Base.metadata.create_all(bind=connection)
+
+    # Seed access-control records only after the schema is available.
+    from app.services.rbac_service import seed_access_control
+
+    with SessionLocal() as session:
+        seed_access_control(session)

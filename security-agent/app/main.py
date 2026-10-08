@@ -9,6 +9,7 @@ from sqlalchemy.exc import SQLAlchemyError
 from app.core.config import settings
 from app.database.database import SessionLocal, init_db
 from app.api.auth import router as auth_router
+from app.api.users import router as users_router
 
 
 @asynccontextmanager
@@ -20,6 +21,7 @@ async def lifespan(_: FastAPI):
 
 app = FastAPI(title=settings.app_name, lifespan=lifespan)
 app.include_router(auth_router)
+app.include_router(users_router)
 
 
 @app.get("/health")
