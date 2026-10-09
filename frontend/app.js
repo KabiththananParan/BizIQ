@@ -12,14 +12,18 @@ const API_BASE = window.location.port === "8000"
   ? "" 
   : "http://127.0.0.1:8000";
 
+const AUTH_STORAGE_KEY = "biziq_auth_session";
+
 // Global App State
 const state = {
   activeTab: "tab-query-hub",
   currentUser: {
-    id: "1",
+    id: "2",
     username: "achini",
     name: "Achini",
+    fullName: "Achini (Lead Business Analyst)",
     role: "ANALYST",
+    email: "achini@biziq.com",
     token: null,
   },
   currentInsight: null,
@@ -30,6 +34,29 @@ const state = {
   auditLogs: [],
   users: [],
 };
+
+// ============================================================================
+// Authenticated Fetch Wrapper
+// ============================================================================
+
+async function authFetch(url, options = {}) {
+  const headers = new Headers(options.headers || {});
+  
+  if (state.currentUser && state.currentUser.token) {
+    headers.set("Authorization", `Bearer ${state.currentUser.token}`);
+  }
+  if (state.currentUser && state.currentUser.id) {
+    headers.set("X-User-Id", String(state.currentUser.id));
+  }
+  if (state.currentUser && state.currentUser.role) {
+    headers.set("X-User-Role", state.currentUser.role);
+  }
+
+  return fetch(url, {
+    ...options,
+    headers,
+  });
+}
 
 // ============================================================================
 // Initialization & Lifecycle
@@ -46,8 +73,10 @@ document.addEventListener("DOMContentLoaded", () => {
   initArchitecture();
   initModals();
 
-  // Initial data fetch
-  refreshAllSystemState();
+  // Restore authenticated session from localStorage or auto-sign in default demo profile
+  restoreAuthSession().then(() => {
+    refreshAllSystemState();
+  });
 });
 
 async function refreshAllSystemState() {
@@ -91,45 +120,324 @@ function switchTab(tabId) {
 }
 
 // ============================================================================
-// User & Auth Management
+// User & Auth Management (Sign In, JWT HS256, Persistence)
 // ============================================================================
+
+function saveAuthSession(token, user) {
+  try {
+    localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify({ token, user }));
+  } catch (e) {
+    console.warn("Could not persist session:", e);
+  }
+}
+
+function clearAuthSession() {
+  try {
+    localStorage.removeItem(AUTH_STORAGE_KEY);
+  } catch (e) {
+    console.warn("Could not clear session:", e);
+  }
+}
+
+async function restoreAuthSession() {
+  try {
+    const raw = localStorage.getItem(AUTH_STORAGE_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (parsed && parsed.token && parsed.user) {
+        parsed.user.token = parsed.token;
+        setUser(parsed.user);
+
+        // Verify token with backend
+        try {
+          const res = await fetch(`${API_BASE}/api/v1/auth/me`, {
+            headers: { Authorization: `Bearer ${parsed.token}` },
+          });
+          if (res.ok) {
+            const freshUser = await res.json();
+            freshUser.token = parsed.token;
+            saveAuthSession(parsed.token, freshUser);
+            setUser(freshUser);
+            return;
+          }
+        } catch (_) {}
+      }
+    }
+  } catch (e) {
+    console.warn("Failed to parse saved session:", e);
+  }
+
+  // Fallback: perform initial sign in for default demo profile (Achini)
+  await signInWithCredentials("achini@biziq.com", "Achini123!", true);
+}
+
+function setUser(user) {
+  if (!user) return;
+  
+  const rawName = user.full_name || user.name || user.username || "User";
+  const roleName = (user.role || "ANALYST").toUpperCase();
+  const username = user.username || "user";
+  const email = user.email || `${username}@biziq.com`;
+
+  state.currentUser = {
+    id: String(user.id || (username === "admin" ? "1" : (username === "achini" ? "2" : "3"))),
+    username: username,
+    name: rawName.split(" ")[0],
+    fullName: rawName,
+    role: roleName,
+    email: email,
+    token: user.token || state.currentUser.token || null,
+  };
+
+  const nameEl = document.getElementById("currentUserName");
+  if (nameEl) nameEl.textContent = state.currentUser.name;
+
+  const roleBadge = document.getElementById("currentUserRole");
+  if (roleBadge) {
+    roleBadge.textContent = state.currentUser.role;
+    roleBadge.className = `user-role-badge ${state.currentUser.role.toLowerCase()}`;
+  }
+
+  const avatarEl = document.getElementById("userAvatar");
+  if (avatarEl) avatarEl.textContent = (state.currentUser.name || "U")[0].toUpperCase();
+
+  const emailEl = document.getElementById("dropdownUserEmail");
+  if (emailEl) emailEl.textContent = state.currentUser.email;
+
+  const jwtPill = document.getElementById("jwtStatusPill");
+  if (jwtPill) {
+    if (state.currentUser.token) {
+      jwtPill.classList.remove("inactive");
+      jwtPill.classList.add("active");
+      jwtPill.title = `JWT HS256 Token Active for ${state.currentUser.fullName} (${state.currentUser.role})`;
+      jwtPill.textContent = "🔒 JWT";
+    } else {
+      jwtPill.classList.remove("active");
+      jwtPill.classList.add("inactive");
+      jwtPill.title = "No active JWT Token (Guest / Signed Out)";
+      jwtPill.textContent = "🔓 No JWT";
+    }
+  }
+
+  const signInBtn = document.getElementById("headerSignInBtn");
+  if (signInBtn) {
+    if (state.currentUser.token) {
+      signInBtn.innerHTML = `<span>🔄</span> Switch`;
+      signInBtn.title = `Signed in as ${state.currentUser.fullName}. Click to switch or create account.`;
+    } else {
+      signInBtn.innerHTML = `<span>🔑</span> Sign In`;
+      signInBtn.title = "Click to Sign In with JWT";
+    }
+  }
+}
+
+async function signInWithCredentials(identifier, password, silent = false) {
+  const banner = document.getElementById("authStatusBanner");
+  const spinner = document.getElementById("loginSpinner");
+  const btnText = document.getElementById("loginBtnText");
+  const loginBtn = document.getElementById("doLoginBtn");
+
+  if (!silent) {
+    if (spinner) spinner.classList.remove("hidden");
+    if (btnText) btnText.textContent = "Authenticating...";
+    if (loginBtn) loginBtn.disabled = true;
+    if (banner) {
+      banner.className = "auth-banner hidden";
+      banner.textContent = "";
+    }
+  }
+
+  try {
+    const res = await fetch(`${API_BASE}/api/v1/auth/login`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email: identifier, password: password }),
+    });
+
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ detail: "Invalid credentials" }));
+      throw new Error(err.detail || "Authentication failed. Please verify credentials.");
+    }
+
+    const data = await res.json();
+    const token = data.access_token;
+    const userData = data.user || {};
+    userData.token = token;
+
+    saveAuthSession(token, userData);
+    setUser(userData);
+
+    const authModal = document.getElementById("authModal");
+    if (authModal) authModal.classList.add("hidden");
+
+    if (!silent) {
+      showToast(`Welcome back, ${state.currentUser.fullName}! (${state.currentUser.role})`, "success");
+    }
+
+    // Refresh UI data for user
+    refreshAllSystemState();
+    return true;
+  } catch (error) {
+    if (!silent) {
+      if (banner) {
+        banner.className = "auth-banner error";
+        banner.textContent = `Authentication failed: ${error.message}`;
+        banner.classList.remove("hidden");
+      }
+      showToast(error.message, "error");
+    }
+    return false;
+  } finally {
+    if (!silent) {
+      if (spinner) spinner.classList.add("hidden");
+      if (btnText) btnText.textContent = "Sign In with JWT";
+      if (loginBtn) loginBtn.disabled = false;
+    }
+  }
+}
+
+async function registerAccount(fullName, username, email, password, role) {
+  const banner = document.getElementById("authStatusBanner");
+  const spinner = document.getElementById("regSpinner");
+  const btnText = document.getElementById("regBtnText");
+  const regBtn = document.getElementById("doRegisterBtn");
+
+  if (!fullName || !username || !email || !password) {
+    if (banner) {
+      banner.className = "auth-banner error";
+      banner.textContent = "Please fill in all required registration fields.";
+      banner.classList.remove("hidden");
+    }
+    showToast("Please fill in all registration fields.", "error");
+    return false;
+  }
+
+  if (password.length < 6) {
+    if (banner) {
+      banner.className = "auth-banner error";
+      banner.textContent = "Password must be at least 6 characters.";
+      banner.classList.remove("hidden");
+    }
+    showToast("Password must be at least 6 characters.", "error");
+    return false;
+  }
+
+  if (spinner) spinner.classList.remove("hidden");
+  if (btnText) btnText.textContent = "Creating Account...";
+  if (regBtn) regBtn.disabled = true;
+  if (banner) {
+    banner.className = "auth-banner hidden";
+    banner.textContent = "";
+  }
+
+  try {
+    const res = await fetch(`${API_BASE}/api/v1/auth/register`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        full_name: fullName,
+        username: username,
+        email: email,
+        password: password,
+        role: role || "ANALYST",
+      }),
+    });
+
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ detail: "Registration failed" }));
+      throw new Error(err.detail || "Registration failed. User may already exist.");
+    }
+
+    if (banner) {
+      banner.className = "auth-banner success";
+      banner.textContent = "Account created successfully! Signing in...";
+      banner.classList.remove("hidden");
+    }
+
+    // Auto sign in with the new credentials
+    const success = await signInWithCredentials(email, password, false);
+    if (success) {
+      showToast(`Account registered and signed in as ${fullName}!`, "success");
+    }
+    return success;
+  } catch (error) {
+    if (banner) {
+      banner.className = "auth-banner error";
+      banner.textContent = error.message;
+      banner.classList.remove("hidden");
+    }
+    showToast(error.message, "error");
+    return false;
+  } finally {
+    if (spinner) spinner.classList.add("hidden");
+    if (btnText) btnText.textContent = "Create Account & Sign In";
+    if (regBtn) regBtn.disabled = false;
+  }
+}
+
+function signOutUser() {
+  clearAuthSession();
+  setUser({
+    id: null,
+    username: "guest",
+    full_name: "Guest User",
+    role: "GUEST",
+    email: "Not signed in",
+    token: null,
+  });
+  showToast("Signed out. Operating in Guest mode.", "info");
+  const authModal = document.getElementById("authModal");
+  if (authModal) authModal.classList.remove("hidden");
+}
 
 function initUserSwitcher() {
   const activeUserBtn = document.getElementById("activeUserBtn");
   const userDropdown = document.getElementById("userDropdownMenu");
+  const headerSignInBtn = document.getElementById("headerSignInBtn");
+  const openAuthModalBtn = document.getElementById("openAuthModalBtn");
+  const logoutBtn = document.getElementById("logoutBtn");
+  const authModal = document.getElementById("authModal");
 
-  activeUserBtn.addEventListener("click", (e) => {
-    e.stopPropagation();
-    userDropdown.classList.toggle("hidden");
-  });
+  if (activeUserBtn && userDropdown) {
+    activeUserBtn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      userDropdown.classList.toggle("hidden");
+    });
 
-  document.addEventListener("click", () => {
-    userDropdown.classList.add("hidden");
-  });
-
-  document.querySelectorAll(".dropdown-item[data-user]").forEach(item => {
-    item.addEventListener("click", () => {
-      const userKey = item.dataset.user;
-      const role = item.dataset.role;
-      const name = item.dataset.name;
-      setUser(userKey, name, role);
+    document.addEventListener("click", () => {
       userDropdown.classList.add("hidden");
-      showToast(`Switched active profile to ${name}`, "success");
+    });
+  }
+
+  if (headerSignInBtn && authModal) {
+    headerSignInBtn.addEventListener("click", () => {
+      authModal.classList.remove("hidden");
+    });
+  }
+
+  if (openAuthModalBtn && authModal) {
+    openAuthModalBtn.addEventListener("click", () => {
+      if (userDropdown) userDropdown.classList.add("hidden");
+      authModal.classList.remove("hidden");
+    });
+  }
+
+  if (logoutBtn) {
+    logoutBtn.addEventListener("click", () => {
+      if (userDropdown) userDropdown.classList.add("hidden");
+      signOutUser();
+    });
+  }
+
+  // Quick switch dropdown items
+  document.querySelectorAll(".dropdown-item[data-quick-email]").forEach(item => {
+    item.addEventListener("click", async () => {
+      const email = item.dataset.quickEmail;
+      const pwd = item.dataset.quickPwd;
+      if (userDropdown) userDropdown.classList.add("hidden");
+      await signInWithCredentials(email, pwd, false);
     });
   });
-}
-
-function setUser(username, fullName, role) {
-  state.currentUser.username = username;
-  state.currentUser.name = fullName.split(" ")[0];
-  state.currentUser.role = role.toUpperCase();
-  state.currentUser.id = username === "admin" ? "1" : (username === "achini" ? "2" : "3");
-
-  document.getElementById("currentUserName").textContent = state.currentUser.name;
-  const roleBadge = document.getElementById("currentUserRole");
-  roleBadge.textContent = state.currentUser.role;
-  roleBadge.className = `user-role-badge ${role.toLowerCase()}`;
-  document.getElementById("userAvatar").textContent = state.currentUser.name[0];
 }
 
 // ============================================================================
@@ -220,12 +528,12 @@ async function executeMultiAgentPipeline(question) {
     const payload = {
       question: question,
       top_k: topK,
-      user_id: state.currentUser.id,
-      user_role: state.currentUser.role.toLowerCase(),
+      user_id: String(state.currentUser.id || "1"),
+      user_role: (state.currentUser.role || "analyst").toLowerCase(),
       owner: "demo",
     };
 
-    const res = await fetch(`${API_BASE}/api/orchestrate/query`, {
+    const res = await authFetch(`${API_BASE}/api/orchestrate/query`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
@@ -504,7 +812,7 @@ function renderChart(chartSpec, stats, forecast) {
 
 async function loadSavedQueries() {
   try {
-    const res = await fetch(`${API_BASE}/api/v1/nlp/queries?limit=30`);
+    const res = await authFetch(`${API_BASE}/api/v1/nlp/queries?limit=30`);
     if (res.ok) {
       state.queries = await res.json();
       renderHistoryList("");
@@ -552,7 +860,7 @@ function renderHistoryList(filterTerm = "") {
     btn.addEventListener("click", async (e) => {
       e.stopPropagation();
       const qId = btn.dataset.delId;
-      await fetch(`${API_BASE}/api/v1/nlp/queries/${qId}`, { method: "DELETE" });
+      await authFetch(`${API_BASE}/api/v1/nlp/queries/${qId}`, { method: "DELETE" });
       loadSavedQueries();
       showToast("Question removed from history", "success");
     });
@@ -562,7 +870,7 @@ function renderHistoryList(filterTerm = "") {
 async function submitFeedback(helpful) {
   if (!state.currentInsight || !state.currentInsight.id) return;
   try {
-    await fetch(`${API_BASE}/api/v1/insight/insights/${state.currentInsight.id}/feedback`, {
+    await authFetch(`${API_BASE}/api/v1/insight/insights/${state.currentInsight.id}/feedback`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ helpful, comment: helpful ? "Helpful" : "Needs detail" }),
@@ -591,7 +899,7 @@ async function runNlpTest() {
   if (!input) return;
 
   try {
-    const res = await fetch(`${API_BASE}/api/v1/nlp/process`, {
+    const res = await authFetch(`${API_BASE}/api/v1/nlp/process`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ question: input, top_k: 5 }),
@@ -618,7 +926,7 @@ async function runNlpTest() {
 async function loadNlpQueriesTable() {
   const tbody = document.getElementById("nlpQueriesTableBody");
   try {
-    const res = await fetch(`${API_BASE}/api/v1/nlp/queries?limit=25`);
+    const res = await authFetch(`${API_BASE}/api/v1/nlp/queries?limit=25`);
     const list = await res.json();
     if (!list.length) {
       tbody.innerHTML = `<tr><td colspan="5" style="text-align:center; color:var(--text-muted);">No queries logged yet.</td></tr>`;
@@ -639,7 +947,7 @@ async function loadNlpQueriesTable() {
 }
 
 window.deleteNlpQuery = async function(id) {
-  await fetch(`${API_BASE}/api/v1/nlp/queries/${id}`, { method: "DELETE" });
+  await authFetch(`${API_BASE}/api/v1/nlp/queries/${id}`, { method: "DELETE" });
   loadNlpQueriesTable();
   loadSavedQueries();
   showToast("Query deleted", "success");
@@ -650,9 +958,13 @@ window.deleteNlpQuery = async function(id) {
 // ============================================================================
 
 function initIrVault() {
-  document.getElementById("openNewDatasourceModalBtn").addEventListener("click", () => {
-    document.getElementById("datasourceModal").classList.remove("hidden");
-  });
+  const openBtn = document.getElementById("openNewDatasourceModalBtn");
+  if (openBtn) {
+    openBtn.addEventListener("click", () => {
+      const modal = document.getElementById("addDataSourceModal") || document.getElementById("datasourceModal");
+      if (modal) modal.classList.remove("hidden");
+    });
+  }
   document.getElementById("btnReSeedDemoData").addEventListener("click", reSeedDemoData);
   document.getElementById("irRunSearchBtn").addEventListener("click", runIrTestSearch);
 }
@@ -660,7 +972,7 @@ function initIrVault() {
 async function loadDataSources() {
   const container = document.getElementById("datasourcesContainer");
   try {
-    const res = await fetch(`${API_BASE}/api/v1/ir/datasources?owner=demo`);
+    const res = await authFetch(`${API_BASE}/api/v1/ir/datasources?owner=demo`);
     state.datasources = await res.json();
     if (!state.datasources.length) {
       container.innerHTML = `<div class="empty-state">No data sources in repository. Click "Load Sample SME Datasets" to populate.</div>`;
@@ -686,7 +998,7 @@ async function loadDataSources() {
 
 async function reSeedDemoData() {
   try {
-    await fetch(`${API_BASE}/api/system/seed-demo`, { method: "POST" });
+    await authFetch(`${API_BASE}/api/system/seed-demo`, { method: "POST" });
     loadDataSources();
     showToast("Sample SME datasets loaded & indexed successfully!", "success");
   } catch (e) {
@@ -701,7 +1013,7 @@ async function runIrTestSearch() {
 
   resultsBox.innerHTML = `<div class="loading-state">Ranking corpus with TF-IDF...</div>`;
   try {
-    const res = await fetch(`${API_BASE}/api/v1/ir/search`, {
+    const res = await authFetch(`${API_BASE}/api/v1/ir/search`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ query: query, top_k: 5, owner: "demo" }),
@@ -727,7 +1039,7 @@ async function runIrTestSearch() {
 }
 
 window.deleteDatasource = async function(id) {
-  await fetch(`${API_BASE}/api/v1/ir/datasources/${id}?owner=demo`, { method: "DELETE" });
+  await authFetch(`${API_BASE}/api/v1/ir/datasources/${id}?owner=demo`, { method: "DELETE" });
   loadDataSources();
   showToast("Data source retired", "success");
 };
@@ -747,7 +1059,7 @@ function initInsightReports() {
 async function loadReports() {
   const container = document.getElementById("reportsListContainer");
   try {
-    const res = await fetch(`${API_BASE}/api/v1/insight/reports`);
+    const res = await authFetch(`${API_BASE}/api/v1/insight/reports`);
     state.reports = await res.json();
     if (!state.reports.length) {
       container.innerHTML = `<div class="empty-state">No saved executive reports yet. Click "Save to Report" from the AI Query Hub.</div>`;
@@ -777,7 +1089,7 @@ async function loadReports() {
 async function loadInsightsHistory() {
   const container = document.getElementById("insightsHistoryList");
   try {
-    const res = await fetch(`${API_BASE}/api/v1/insight/insights?limit=15`);
+    const res = await authFetch(`${API_BASE}/api/v1/insight/insights?limit=15`);
     const list = await res.json();
     if (!list.length) {
       container.innerHTML = `<div class="empty-state">No insights generated yet.</div>`;
@@ -798,13 +1110,13 @@ async function loadInsightsHistory() {
 }
 
 window.deleteReport = async function(id) {
-  await fetch(`${API_BASE}/api/v1/insight/reports/${id}`, { method: "DELETE" });
+  await authFetch(`${API_BASE}/api/v1/insight/reports/${id}`, { method: "DELETE" });
   loadReports();
   showToast("Report removed", "success");
 };
 
 window.viewReportDetail = async function(id) {
-  const res = await fetch(`${API_BASE}/api/v1/insight/reports/${id}`);
+  const res = await authFetch(`${API_BASE}/api/v1/insight/reports/${id}`);
   const report = await res.json();
   if (report.insight) {
     switchTab("tab-query-hub");
@@ -814,7 +1126,7 @@ window.viewReportDetail = async function(id) {
 };
 
 window.inspectInsight = async function(id) {
-  const res = await fetch(`${API_BASE}/api/v1/insight/insights/${id}`);
+  const res = await authFetch(`${API_BASE}/api/v1/insight/insights/${id}`);
   const insight = await res.json();
   switchTab("tab-query-hub");
   renderInsightResult({ insight: insight });
@@ -836,7 +1148,7 @@ function initSecurityCenter() {
 async function loadAuditLogs() {
   const tbody = document.getElementById("auditLogsTableBody");
   try {
-    const res = await fetch(`${API_BASE}/api/v1/audit/logs?limit=30`);
+    const res = await authFetch(`${API_BASE}/api/v1/audit/logs?limit=30`);
     state.auditLogs = await res.json();
     document.getElementById("secTotalAudits").textContent = state.auditLogs.length;
 
@@ -860,13 +1172,15 @@ async function loadAuditLogs() {
 
 async function loadUsers() {
   try {
-    const res = await fetch(`${API_BASE}/api/v1/users`);
+    const res = await authFetch(`${API_BASE}/api/v1/users`);
     state.users = await res.json();
     document.getElementById("secTotalUsers").textContent = state.users.length;
     
     // Populate dropdown
     const select = document.getElementById("anomalyUserSelect");
-    select.innerHTML = state.users.map(u => `<option value="${u.id}">${u.full_name} (${u.role})</option>`).join("");
+    if (select) {
+      select.innerHTML = state.users.map(u => `<option value="${u.id}">${u.full_name} (${u.role})</option>`).join("");
+    }
   } catch (e) {
     console.error(e);
   }
@@ -879,7 +1193,7 @@ async function runSecurityAnalysis() {
 
   resultBox.innerHTML = `<div class="loading-state">Analyzing access telemetry & running AI Anomaly Reasoning...</div>`;
   try {
-    const res = await fetch(`${API_BASE}/api/v1/security/analyze?user_id=${userId}`, { method: "POST" });
+    const res = await authFetch(`${API_BASE}/api/v1/security/analyze?user_id=${userId}`, { method: "POST" });
     const data = await res.json();
     const ai = data.ai_result || {};
     const risk = ai.risk_level || "LOW";
@@ -912,7 +1226,7 @@ function initArchitecture() {
 
 async function checkSystemStatus() {
   try {
-    const res = await fetch(`${API_BASE}/api/system/status`);
+    const res = await authFetch(`${API_BASE}/api/system/status`);
     const data = await res.json();
     const ag = data.agents || {};
 
@@ -933,128 +1247,404 @@ async function checkSystemStatus() {
 }
 
 // ============================================================================
-// Modals Handling
+// Modals & Authentication Controllers
 // ============================================================================
 
 function initModals() {
-  // Datasource Modal
-  const dsModal = document.getElementById("datasourceModal");
-  document.getElementById("closeDatasourceModalBtn").addEventListener("click", () => dsModal.classList.add("hidden"));
-  document.getElementById("cancelDatasourceBtn").addEventListener("click", () => dsModal.classList.add("hidden"));
-
-  document.getElementById("saveDatasourceBtn").addEventListener("click", async () => {
-    const name = document.getElementById("dsNameInput").value.trim();
-    const type = document.getElementById("dsTypeSelect").value;
-    const desc = document.getElementById("dsDescInput").value.trim();
-    const content = document.getElementById("dsContentInput").value.trim();
-
-    if (!name || !content) {
-      showToast("Please provide dataset name and content.", "error");
-      return;
-    }
-
-    try {
-      await fetch(`${API_BASE}/api/v1/ir/datasources`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name, description: desc, content, source_type: type, owner: "demo" }),
-      });
-      dsModal.classList.add("hidden");
-      loadDataSources();
-      showToast(`Data source "${name}" indexed!`, "success");
-    } catch (e) {
-      showToast(`Save error: ${e.message}`, "error");
-    }
-  });
+  // Datasource Modal with Computer File Upload & Drag-and-Drop
+  initDatasourceModal();
 
   // Report Modal
   const repModal = document.getElementById("saveReportModal");
-  document.getElementById("closeReportModalBtn").addEventListener("click", () => repModal.classList.add("hidden"));
-  document.getElementById("cancelReportBtn").addEventListener("click", () => repModal.classList.add("hidden"));
+  const closeRepBtn = document.getElementById("closeReportModalBtn");
+  const cancelRepBtn = document.getElementById("cancelReportBtn");
+  const saveRepBtn = document.getElementById("confirmSaveReportBtn");
 
-  document.getElementById("confirmSaveReportBtn").addEventListener("click", async () => {
-    const title = document.getElementById("reportTitleInput").value.trim();
-    const notes = document.getElementById("reportNotesInput").value.trim();
+  if (closeRepBtn && repModal) closeRepBtn.addEventListener("click", () => repModal.classList.add("hidden"));
+  if (cancelRepBtn && repModal) cancelRepBtn.addEventListener("click", () => repModal.classList.add("hidden"));
 
-    if (!title || !state.currentInsight) return;
-    try {
-      await fetch(`${API_BASE}/api/v1/insight/reports`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          insight_id: state.currentInsight.id,
-          title: title,
-          notes: notes,
-          user_id: state.currentUser.id,
-        }),
-      });
-      repModal.classList.add("hidden");
-      loadReports();
-      showToast("Executive report pinned & saved!", "success");
-    } catch (e) {
-      showToast(`Report error: ${e.message}`, "error");
-    }
-  });
+  if (saveRepBtn) {
+    saveRepBtn.addEventListener("click", async () => {
+      const title = document.getElementById("reportTitleInput").value.trim();
+      const notes = document.getElementById("reportNotesInput").value.trim();
 
-  // Auth Modal
-  const authModal = document.getElementById("authModal");
-  document.getElementById("openAuthModalBtn").addEventListener("click", () => authModal.classList.remove("hidden"));
-  document.getElementById("closeAuthModalBtn").addEventListener("click", () => authModal.classList.add("hidden"));
-
-  document.getElementById("authTabLogin").addEventListener("click", () => {
-    document.getElementById("authTabLogin").classList.add("active");
-    document.getElementById("authTabRegister").classList.remove("active");
-    document.getElementById("authLoginForm").classList.remove("hidden");
-    document.getElementById("authRegisterForm").classList.add("hidden");
-  });
-
-  document.getElementById("authTabRegister").addEventListener("click", () => {
-    document.getElementById("authTabRegister").classList.add("active");
-    document.getElementById("authTabLogin").classList.remove("active");
-    document.getElementById("authRegisterForm").classList.remove("hidden");
-    document.getElementById("authLoginForm").classList.add("hidden");
-  });
-
-  document.getElementById("doLoginBtn").addEventListener("click", async () => {
-    const email = document.getElementById("loginEmail").value.trim();
-    const password = document.getElementById("loginPassword").value.trim();
-    try {
-      const res = await fetch(`${API_BASE}/api/v1/auth/login`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password }),
-      });
-      if (!res.ok) throw new Error("Invalid credentials");
-      const data = await res.json();
-      state.currentUser.token = data.access_token;
-      if (data.user) {
-        setUser(data.user.username, data.user.full_name, data.user.role);
+      if (!title || !state.currentInsight) return;
+      try {
+        await authFetch(`${API_BASE}/api/v1/insight/reports`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            insight_id: state.currentInsight.id,
+            title: title,
+            notes: notes,
+            user_id: state.currentUser.id || "1",
+          }),
+        });
+        if (repModal) repModal.classList.add("hidden");
+        loadReports();
+        showToast("Executive report pinned & saved!", "success");
+      } catch (e) {
+        showToast(`Report error: ${e.message}`, "error");
       }
-      authModal.classList.add("hidden");
-      showToast(`Welcome back, ${state.currentUser.name}!`, "success");
-    } catch (e) {
-      showToast("Login failed: Check credentials", "error");
-    }
+    });
+  }
+
+  // Authentication Modal
+  initAuthModal();
+}
+
+function initDatasourceModal() {
+  const dsModal = document.getElementById("datasourceModal");
+  const closeDsBtn = document.getElementById("closeDatasourceModalBtn");
+  const cancelDsBtn = document.getElementById("cancelDatasourceBtn");
+  const saveDsBtn = document.getElementById("saveDatasourceBtn");
+  const tabUpload = document.getElementById("tabUploadFile");
+  const tabPaste = document.getElementById("tabPasteText");
+  const fileSection = document.getElementById("fileUploadSection");
+  const dropZone = document.getElementById("fileDropZone");
+  const fileInput = document.getElementById("dsFileInput");
+  const fileInfo = document.getElementById("uploadedFileInfo");
+  const fileNameEl = document.getElementById("uploadedFileName");
+  const fileSizeEl = document.getElementById("uploadedFileSize");
+  const fileStatsEl = document.getElementById("uploadedFileStats");
+  const fileIconEl = document.getElementById("fileTypeIcon");
+  const removeFileBtn = document.getElementById("removeFileBtn");
+  const contentInput = document.getElementById("dsContentInput");
+  const nameInput = document.getElementById("dsNameInput");
+  const typeSelect = document.getElementById("dsTypeSelect");
+  const descInput = document.getElementById("dsDescInput");
+  const charCounter = document.getElementById("contentCharCounter");
+  const saveSpinner = document.getElementById("saveDsSpinner");
+  const saveBtnText = document.getElementById("saveDsBtnText");
+
+  if (!dsModal) return;
+
+  // Close handlers
+  if (closeDsBtn) closeDsBtn.addEventListener("click", () => dsModal.classList.add("hidden"));
+  if (cancelDsBtn) cancelDsBtn.addEventListener("click", () => dsModal.classList.add("hidden"));
+  dsModal.addEventListener("click", (e) => {
+    if (e.target === dsModal) dsModal.classList.add("hidden");
   });
 
-  document.getElementById("doRegisterBtn").addEventListener("click", async () => {
-    const full_name = document.getElementById("regFullName").value.trim();
-    const username = document.getElementById("regUsername").value.trim();
-    const email = document.getElementById("regEmail").value.trim();
-    const password = document.getElementById("regPassword").value.trim();
-    try {
-      const res = await fetch(`${API_BASE}/api/v1/auth/register`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ full_name, username, email, password }),
+  // Mode tab switching
+  if (tabUpload && tabPaste) {
+    tabUpload.addEventListener("click", () => {
+      tabUpload.classList.add("active");
+      tabPaste.classList.remove("active");
+      if (fileSection) fileSection.classList.remove("hidden");
+    });
+    tabPaste.addEventListener("click", () => {
+      tabPaste.classList.add("active");
+      tabUpload.classList.remove("active");
+      if (fileSection) fileSection.classList.add("hidden");
+    });
+  }
+
+  // File Dropzone interactions
+  if (dropZone && fileInput) {
+    dropZone.addEventListener("click", () => fileInput.click());
+
+    ["dragenter", "dragover"].forEach(eventName => {
+      dropZone.addEventListener(eventName, (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        dropZone.classList.add("drag-over");
       });
-      if (!res.ok) throw new Error("Registration failed");
-      showToast("Account created! You can now login.", "success");
-      document.getElementById("authTabLogin").click();
-    } catch (e) {
-      showToast(`Registration error: ${e.message}`, "error");
-    }
+    });
+
+    ["dragleave", "drop"].forEach(eventName => {
+      dropZone.addEventListener(eventName, (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        dropZone.classList.remove("drag-over");
+      });
+    });
+
+    dropZone.addEventListener("drop", (e) => {
+      const dt = e.dataTransfer;
+      const files = dt ? dt.files : null;
+      if (files && files.length > 0) {
+        handleDatasetFile(files[0]);
+      }
+    });
+
+    fileInput.addEventListener("change", () => {
+      if (fileInput.files && fileInput.files.length > 0) {
+        handleDatasetFile(fileInput.files[0]);
+      }
+    });
+  }
+
+  function handleDatasetFile(file) {
+    if (!file) return;
+
+    // Show file badge
+    if (fileInfo) fileInfo.classList.remove("hidden");
+    if (fileNameEl) fileNameEl.textContent = file.name;
+    if (fileSizeEl) fileSizeEl.textContent = `${(file.size / 1024).toFixed(1)} KB`;
+
+    // Pick icon
+    const isCsv = file.name.endsWith(".csv") || file.name.endsWith(".tsv");
+    const isJson = file.name.endsWith(".json");
+    if (fileIconEl) fileIconEl.textContent = isCsv ? "📊" : (isJson ? "{}" : "📝");
+
+    // Read content
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const text = event.target.result || "";
+      if (contentInput) {
+        contentInput.value = text;
+        updateContentStats(text);
+      }
+
+      // Auto-populate Title if empty
+      if (nameInput && (!nameInput.value.trim() || nameInput.dataset.autoFilled)) {
+        const cleanName = file.name.replace(/\.[^/.]+$/, "").replace(/[_\-\.]+/g, " ");
+        nameInput.value = cleanName.charAt(0).toUpperCase() + cleanName.slice(1);
+        nameInput.dataset.autoFilled = "true";
+      }
+
+      // Auto-populate Format
+      if (typeSelect) {
+        typeSelect.value = (isCsv || (text.split("\n")[0] && text.split("\n")[0].includes(","))) ? "csv" : "text";
+      }
+
+      // Auto-detect description if empty
+      if (descInput && !descInput.value.trim()) {
+        descInput.value = `Imported from ${file.name} (${(file.size / 1024).toFixed(1)} KB)`;
+      }
+
+      // Calculate row stats
+      const lines = text.trim().split("\n").filter(l => l.trim().length > 0);
+      if (fileStatsEl) {
+        if (isCsv && lines.length > 0) {
+          const colCount = lines[0].split(",").length;
+          fileStatsEl.textContent = `${lines.length - 1} data rows • ${colCount} cols`;
+        } else {
+          fileStatsEl.textContent = `${lines.length} lines parsed`;
+        }
+      }
+
+      showToast(`Loaded ${file.name} successfully!`, "success");
+    };
+
+    reader.onerror = () => {
+      showToast("Error reading file from computer", "error");
+    };
+
+    reader.readAsText(file);
+  }
+
+  // Remove attached file
+  if (removeFileBtn) {
+    removeFileBtn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      if (fileInput) fileInput.value = "";
+      if (fileInfo) fileInfo.classList.add("hidden");
+      if (contentInput) contentInput.value = "";
+      if (nameInput && nameInput.dataset.autoFilled) nameInput.value = "";
+      if (charCounter) charCounter.textContent = "0 lines";
+      showToast("File detached", "info");
+    });
+  }
+
+  // Live content stats counter
+  if (contentInput) {
+    contentInput.addEventListener("input", () => {
+      updateContentStats(contentInput.value);
+    });
+  }
+
+  function updateContentStats(text) {
+    if (!charCounter) return;
+    const lines = text ? text.split("\n").length : 0;
+    const kb = text ? (text.length / 1024).toFixed(1) : "0.0";
+    charCounter.textContent = `${lines} lines • ${kb} KB`;
+  }
+
+  // Save / Index action
+  if (saveDsBtn) {
+    saveDsBtn.addEventListener("click", async () => {
+      const name = nameInput ? nameInput.value.trim() : "";
+      const type = typeSelect ? typeSelect.value : "csv";
+      const desc = descInput ? descInput.value.trim() : "";
+      const content = contentInput ? contentInput.value.trim() : "";
+
+      if (!name || !content) {
+        showToast("Please provide dataset title and content.", "error");
+        return;
+      }
+
+      if (saveSpinner) saveSpinner.classList.remove("hidden");
+      if (saveBtnText) saveBtnText.textContent = "Indexing Corpus...";
+      saveDsBtn.disabled = true;
+
+      try {
+        const res = await authFetch(`${API_BASE}/api/v1/ir/datasources`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            name: name,
+            description: desc,
+            content: content,
+            source_type: type,
+            owner: "demo",
+          }),
+        });
+
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({ detail: "Failed to save dataset" }));
+          throw new Error(err.detail || "Indexing failed");
+        }
+
+        dsModal.classList.add("hidden");
+        // Reset inputs
+        if (fileInput) fileInput.value = "";
+        if (fileInfo) fileInfo.classList.add("hidden");
+        if (nameInput) nameInput.value = "";
+        if (descInput) descInput.value = "";
+        if (contentInput) contentInput.value = "";
+        if (charCounter) charCounter.textContent = "0 lines";
+
+        loadDataSources();
+        showToast(`Dataset "${name}" successfully indexed into IR Vault!`, "success");
+      } catch (e) {
+        showToast(`Dataset indexing error: ${e.message}`, "error");
+      } finally {
+        if (saveSpinner) saveSpinner.classList.add("hidden");
+        if (saveBtnText) saveBtnText.textContent = "⚡ Index Dataset in Vault";
+        saveDsBtn.disabled = false;
+      }
+    });
+  }
+}
+
+function initAuthModal() {
+  const authModal = document.getElementById("authModal");
+  const closeAuthModalBtn = document.getElementById("closeAuthModalBtn");
+  const authTabLogin = document.getElementById("authTabLogin");
+  const authTabRegister = document.getElementById("authTabRegister");
+  const authLoginForm = document.getElementById("authLoginForm");
+  const authRegisterForm = document.getElementById("authRegisterForm");
+  const authBanner = document.getElementById("authStatusBanner");
+  const doLoginBtn = document.getElementById("doLoginBtn");
+  const doRegisterBtn = document.getElementById("doRegisterBtn");
+  const loginEmail = document.getElementById("loginEmail");
+  const loginPassword = document.getElementById("loginPassword");
+  const toggleLoginPwdBtn = document.getElementById("toggleLoginPwdBtn");
+  const toggleRegPwdBtn = document.getElementById("toggleRegPwdBtn");
+  const regPassword = document.getElementById("regPassword");
+
+  if (closeAuthModalBtn && authModal) {
+    closeAuthModalBtn.addEventListener("click", () => {
+      authModal.classList.add("hidden");
+      if (authBanner) authBanner.classList.add("hidden");
+    });
+  }
+
+  // Backdrop click to close
+  if (authModal) {
+    authModal.addEventListener("click", (e) => {
+      if (e.target === authModal) {
+        authModal.classList.add("hidden");
+        if (authBanner) authBanner.classList.add("hidden");
+      }
+    });
+  }
+
+  // Password visibility toggles
+  if (toggleLoginPwdBtn && loginPassword) {
+    toggleLoginPwdBtn.addEventListener("click", () => {
+      const isPassword = loginPassword.type === "password";
+      loginPassword.type = isPassword ? "text" : "password";
+      toggleLoginPwdBtn.textContent = isPassword ? "🙈" : "👁️";
+    });
+  }
+
+  if (toggleRegPwdBtn && regPassword) {
+    toggleRegPwdBtn.addEventListener("click", () => {
+      const isPassword = regPassword.type === "password";
+      regPassword.type = isPassword ? "text" : "password";
+      toggleRegPwdBtn.textContent = isPassword ? "🙈" : "👁️";
+    });
+  }
+
+  // Tab switching
+  if (authTabLogin && authTabRegister) {
+    authTabLogin.addEventListener("click", () => {
+      authTabLogin.classList.add("active");
+      authTabRegister.classList.remove("active");
+      if (authLoginForm) authLoginForm.classList.remove("hidden");
+      if (authRegisterForm) authRegisterForm.classList.add("hidden");
+      if (authBanner) authBanner.classList.add("hidden");
+    });
+
+    authTabRegister.addEventListener("click", () => {
+      authTabRegister.classList.add("active");
+      authTabLogin.classList.remove("active");
+      if (authRegisterForm) authRegisterForm.classList.remove("hidden");
+      if (authLoginForm) authLoginForm.classList.add("hidden");
+      if (authBanner) authBanner.classList.add("hidden");
+    });
+  }
+
+  // Demo Pills in Modal
+  document.querySelectorAll(".demo-pill[data-demo-email]").forEach(pill => {
+    pill.addEventListener("click", async () => {
+      const email = pill.dataset.demoEmail;
+      const pwd = pill.dataset.demoPwd;
+      if (loginEmail) loginEmail.value = email;
+      if (loginPassword) loginPassword.value = pwd;
+      document.querySelectorAll(".demo-pill").forEach(p => p.classList.remove("active"));
+      pill.classList.add("active");
+      await signInWithCredentials(email, pwd, false);
+    });
   });
+
+  // Login action
+  if (doLoginBtn && loginEmail && loginPassword) {
+    doLoginBtn.addEventListener("click", () => {
+      const email = loginEmail.value.trim();
+      const pwd = loginPassword.value.trim();
+      if (!email || !pwd) {
+        if (authBanner) {
+          authBanner.className = "auth-banner error";
+          authBanner.textContent = "Please enter both email/username and password.";
+          authBanner.classList.remove("hidden");
+        }
+        showToast("Please enter email/username and password", "error");
+        return;
+      }
+      signInWithCredentials(email, pwd, false);
+    });
+
+    // Enter key support
+    loginPassword.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") doLoginBtn.click();
+    });
+    loginEmail.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") doLoginBtn.click();
+    });
+  }
+
+  // Register action
+  if (doRegisterBtn) {
+    doRegisterBtn.addEventListener("click", () => {
+      const fullName = document.getElementById("regFullName").value.trim();
+      const username = document.getElementById("regUsername").value.trim();
+      const email = document.getElementById("regEmail").value.trim();
+      const role = document.getElementById("regRole").value;
+      const pwd = document.getElementById("regPassword").value.trim();
+
+      registerAccount(fullName, username, email, pwd, role);
+    });
+
+    if (regPassword) {
+      regPassword.addEventListener("keydown", (e) => {
+        if (e.key === "Enter") doRegisterBtn.click();
+      });
+    }
+  }
 }
 
 // ============================================================================
@@ -1063,9 +1653,10 @@ function initModals() {
 
 function showToast(message, type = "success") {
   const container = document.getElementById("toastContainer");
+  if (!container) return;
   const toast = document.createElement("div");
   toast.className = `toast ${type}`;
-  toast.innerHTML = `<span>${type === 'success' ? '✓' : '⚠️'}</span> <span>${escapeHtml(message)}</span>`;
+  toast.innerHTML = `<span>${type === 'success' ? '✓' : (type === 'error' ? '⚠️' : 'ℹ️')}</span> <span>${escapeHtml(message)}</span>`;
   container.appendChild(toast);
   setTimeout(() => {
     toast.remove();

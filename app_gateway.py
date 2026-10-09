@@ -15,7 +15,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Optional
 
-from fastapi import Depends, FastAPI, HTTPException, Header, Query, status
+from fastapi import Depends, FastAPI, File, Form, HTTPException, Header, Query, UploadFile, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
@@ -285,6 +285,18 @@ def auth_register(payload: RegisterPayload):
         raise HTTPException(status_code=400, detail=str(exc))
 
 
+@app.get("/api/v1/auth/me", tags=["Security & Auth"])
+def auth_me(authorization: Optional[str] = Header(None)):
+    if not authorization or not authorization.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="Missing or invalid Authorization header")
+    token = authorization.split("Bearer ")[1].strip()
+    try:
+        return security_client.verify_token(token)
+    except ValueError as exc:
+        raise HTTPException(status_code=401, detail=str(exc))
+
+
+
 @app.get("/api/v1/users", tags=["Security & Auth"])
 def list_users():
     return security_client.list_users()
@@ -349,6 +361,35 @@ def ir_create_datasource(payload: DataSourceCreatePayload):
         source_type=payload.source_type,
         owner=payload.owner,
     )
+
+
+@app.post("/api/v1/ir/upload", tags=["IR Agent"], status_code=201)
+async def ir_upload_file(
+    file: UploadFile = File(...),
+    name: Optional[str] = Form(None),
+    description: Optional[str] = Form(""),
+    owner: str = Form("demo"),
+):
+    """Upload dataset file from computer (CSV, TXT, TSV, JSON, MD) and index in IR Agent."""
+    try:
+        content_bytes = await file.read()
+        content = content_bytes.decode("utf-8", errors="replace")
+
+        filename = file.filename or "uploaded_dataset"
+        ds_name = name.strip() if (name and name.strip()) else Path(filename).stem.replace("_", " ").replace("-", " ").title()
+
+        source_type = "csv" if filename.lower().endswith((".csv", ".tsv")) or ("," in content.splitlines()[0] if content else False) else "text"
+
+        return ir_client.create_datasource(
+            name=ds_name,
+            description=description or f"Uploaded from file: {filename}",
+            content=content,
+            source_type=source_type,
+            owner=owner,
+        )
+    except Exception as exc:
+        raise HTTPException(status_code=400, detail=f"Failed to process file: {str(exc)}")
+
 
 
 @app.get("/api/v1/ir/datasources/{datasource_id}", tags=["IR Agent"])
