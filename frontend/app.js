@@ -1519,46 +1519,6 @@ function initDatasourceModal() {
   }
 }
 
-
-  // Report Modal
-  const repModal = document.getElementById("saveReportModal");
-  const closeRepBtn = document.getElementById("closeReportModalBtn");
-  const cancelRepBtn = document.getElementById("cancelReportBtn");
-  const saveRepBtn = document.getElementById("confirmSaveReportBtn");
-
-  if (closeRepBtn && repModal) closeRepBtn.addEventListener("click", () => repModal.classList.add("hidden"));
-  if (cancelRepBtn && repModal) cancelRepBtn.addEventListener("click", () => repModal.classList.add("hidden"));
-
-  if (saveRepBtn) {
-    saveRepBtn.addEventListener("click", async () => {
-      const title = document.getElementById("reportTitleInput").value.trim();
-      const notes = document.getElementById("reportNotesInput").value.trim();
-
-      if (!title || !state.currentInsight) return;
-      try {
-        await authFetch(`${API_BASE}/api/v1/insight/reports`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            insight_id: state.currentInsight.id,
-            title: title,
-            notes: notes,
-            user_id: state.currentUser.id || "1",
-          }),
-        });
-        if (repModal) repModal.classList.add("hidden");
-        loadReports();
-        showToast("Executive report pinned & saved!", "success");
-      } catch (e) {
-        showToast(`Report error: ${e.message}`, "error");
-      }
-    });
-  }
-
-  // Authentication Modal
-  initAuthModal();
-}
-
 function initAuthModal() {
   const authModal = document.getElementById("authModal");
   const closeAuthModalBtn = document.getElementById("closeAuthModalBtn");
