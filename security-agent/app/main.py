@@ -14,6 +14,8 @@ from app.api.audit import router as audit_router
 from app.api.security import router as security_router
 
 
+from fastapi.middleware.cors import CORSMiddleware
+
 @asynccontextmanager
 async def lifespan(_: FastAPI):
     """Initialize the local SQLite database when the service starts."""
@@ -22,6 +24,13 @@ async def lifespan(_: FastAPI):
 
 
 app = FastAPI(title=settings.app_name, lifespan=lifespan)
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 app.include_router(auth_router)
 app.include_router(users_router)
 app.include_router(audit_router)

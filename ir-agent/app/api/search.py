@@ -10,6 +10,7 @@ router = APIRouter(tags=["Search"])
 
 
 @router.post("/search", response_model=SearchResponse)
+@router.post("/retrieve", response_model=SearchResponse)
 def search_datasources(payload: SearchRequest, user: AuthUser = Depends(verify_token)):
     """Rank the caller's active data sources against the query (TF-IDF + cosine)."""
     results = run_search(payload.query, owner=user.user_id, top_k=payload.top_k)

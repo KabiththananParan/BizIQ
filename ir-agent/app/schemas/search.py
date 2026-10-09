@@ -14,6 +14,10 @@ MAX_QUERY_CHARS = 500
 class SearchRequest(BaseModel):
     query: str = Field(min_length=1, max_length=MAX_QUERY_CHARS)
     top_k: int = Field(default=3, ge=1, le=20)
+    intent: str | None = None
+    entities: dict | None = None
+    request_id: str | None = None
+    include_structured: bool = False
 
     @field_validator("query")
     @classmethod

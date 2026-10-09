@@ -14,6 +14,9 @@ from app.api import datasources, search
 from database.db import init_db
 
 
+from fastapi.middleware.cors import CORSMiddleware
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     init_db()
@@ -21,6 +24,13 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title="BizIQ - Data Retrieval (IR) Agent", version="0.2.0", lifespan=lifespan)
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 app.include_router(datasources.router)
 app.include_router(search.router)
 

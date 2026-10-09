@@ -24,6 +24,15 @@ def build_user_prompt(question: str, stats: dict, forecast: dict | None, evidenc
 
 
 def _mock(stats: dict) -> dict:
+    if not stats or "metric" not in stats:
+        return {
+            "answer": "Insights extracted from retrieved text evidence.",
+            "key_findings": ["Processed retrieved knowledge records for this query."],
+            "reasoning_steps": ["Analyzed retrieved data sources", "Evaluated context for business question"],
+            "assumptions": ["Mock mode: no external LLM was called"],
+            "confidence": "medium",
+            "limitations": "Mock response for development.",
+        }
     parts = [f"Total {stats['metric']} was {stats['total']}."]
     if "top_group" in stats:
         g = stats["by_group"]
@@ -47,7 +56,7 @@ def generate(question: str, stats: dict, forecast: dict | None, evidence_csv: st
                "response_format": {"type": "json_object"},
                "messages": [{"role": "system", "content": SYSTEM_PROMPT},
                             {"role": "user", "content": build_user_prompt(question, stats, forecast, evidence_csv)}]}
-    headers = {"Authorization": f"Bearer {LLM_API_KEY}"}
+    headers = {"Authorization": f"Bearer {LLM_API_KEY}", "User-Agent": "BizIQ-Client/1.0"}
     for _ in range(2):                                   # one retry on bad JSON / timeout
         try:
             r = httpx.post(f"{LLM_BASE_URL}/chat/completions", json=payload, headers=headers, timeout=45)
