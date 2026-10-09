@@ -390,6 +390,34 @@ class SecurityAgentClient:
             (email, 1 if success else 0, reason, user_id, "127.0.0.1", "BizIQ-Client", _utc_now_str()),
         )
 
+    def verify_token(self, token: str) -> dict[str, Any]:
+        """Decode and verify JWT token, returning user profile."""
+        from jose import jwt, JWTError
+
+        try:
+            payload = jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
+            user_id = payload.get("sub")
+            if not user_id:
+                raise ValueError("Invalid token payload.")
+            with self.get_conn() as conn:
+                row = conn.execute(
+                    """SELECT u.id, u.username, u.email, u.full_name, u.is_active, r.name as role_name
+                       FROM users u LEFT JOIN roles r ON u.role_id = r.id
+                       WHERE u.id=?""",
+                    (int(user_id),),
+                ).fetchone()
+                if not row or not bool(row["is_active"]):
+                    raise ValueError("User inactive or not found.")
+                return {
+                    "id": row["id"],
+                    "username": row["username"],
+                    "email": row["email"],
+                    "full_name": row["full_name"],
+                    "role": row["role_name"] or "USER",
+                }
+        except JWTError as exc:
+            raise ValueError(f"Invalid or expired token: {exc}")
+
     def analyze_anomalies(self, user_id: int):
         with self.get_conn() as conn:
             user = conn.execute("SELECT * FROM users WHERE id=?", (user_id,)).fetchone()

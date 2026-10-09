@@ -285,6 +285,18 @@ def auth_register(payload: RegisterPayload):
         raise HTTPException(status_code=400, detail=str(exc))
 
 
+@app.get("/api/v1/auth/me", tags=["Security & Auth"])
+def auth_me(authorization: Optional[str] = Header(None)):
+    if not authorization or not authorization.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="Missing or invalid Authorization header")
+    token = authorization.split("Bearer ")[1].strip()
+    try:
+        return security_client.verify_token(token)
+    except ValueError as exc:
+        raise HTTPException(status_code=401, detail=str(exc))
+
+
+
 @app.get("/api/v1/users", tags=["Security & Auth"])
 def list_users():
     return security_client.list_users()

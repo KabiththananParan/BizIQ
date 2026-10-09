@@ -55,30 +55,48 @@
 
     <!-- User & Auth Menu -->
     <div class="header-right">
-      <div class="user-switcher-dropdown">
-        <div class="active-user-card" id="activeUserBtn">
-          <div class="user-avatar" id="userAvatar">A</div>
-          <div class="user-meta">
-            <span class="user-name" id="currentUserName">Achini</span>
-            <span class="user-role-badge analyst" id="currentUserRole">ANALYST</span>
+      <div class="auth-header-actions">
+        <button class="signin-header-btn" id="headerSignInBtn">
+          <span>🔑</span> Sign In
+        </button>
+        <div class="user-switcher-dropdown">
+          <div class="active-user-card" id="activeUserBtn">
+            <div class="user-avatar" id="userAvatar">A</div>
+            <div class="user-meta">
+              <span class="user-name" id="currentUserName">Achini</span>
+              <div class="user-submeta">
+                <span class="user-role-badge analyst" id="currentUserRole">ANALYST</span>
+                <span class="jwt-status-pill" id="jwtStatusPill" title="JWT HS256 Token Active">🔒 JWT</span>
+              </div>
+            </div>
+            <span class="chevron-icon">⌄</span>
           </div>
-          <span class="chevron-icon">⌄</span>
-        </div>
-        <div class="user-dropdown-menu hidden" id="userDropdownMenu">
-          <div class="dropdown-header">Quick Role Switcher</div>
-          <button class="dropdown-item" data-user="achini" data-role="analyst" data-name="Achini (Lead Analyst)">
-            <span>👩‍💼</span> Achini (Lead Analyst)
-          </button>
-          <button class="dropdown-item" data-user="admin" data-role="admin" data-name="System Administrator">
-            <span>🛡️</span> Admin (Security Admin)
-          </button>
-          <button class="dropdown-item" data-user="sme_owner" data-role="user" data-name="SME Business Owner">
-            <span>💼</span> SME Business Owner (User)
-          </button>
-          <div class="dropdown-divider"></div>
-          <button class="dropdown-item" id="openAuthModalBtn">
-            <span>🔑</span> Login / Register Custom Account
-          </button>
+          <div class="user-dropdown-menu hidden" id="userDropdownMenu">
+            <div class="dropdown-header">
+              <span>ACTIVE SESSION</span>
+              <span class="session-email" id="dropdownUserEmail">achini@biziq.com</span>
+            </div>
+            <div class="dropdown-section-label">QUICK SWITCH DEMO ACCOUNT</div>
+            <button class="dropdown-item" data-quick-email="achini@biziq.com" data-quick-pwd="Achini123!" data-user="achini" data-role="analyst" data-name="Achini (Lead Analyst)">
+              <span>👩‍💼</span> Achini (Lead Analyst)
+            </button>
+            <button class="dropdown-item" data-quick-email="admin@biziq.com" data-quick-pwd="Admin123!" data-user="admin" data-role="admin" data-name="System Administrator">
+              <span>🛡️</span> Admin (Security Admin)
+            </button>
+            <button class="dropdown-item" data-quick-email="owner@biziq.com" data-quick-pwd="Owner123!" data-user="sme_owner" data-role="user" data-name="SME Business Owner">
+              <span>💼</span> SME Business Owner (User)
+            </button>
+            <button class="dropdown-item" data-quick-email="analyst@biziq.com" data-quick-pwd="Analyst123!" data-user="analyst" data-role="analyst" data-name="Financial Analyst">
+              <span>📊</span> Financial Analyst
+            </button>
+            <div class="dropdown-divider"></div>
+            <button class="dropdown-item" id="openAuthModalBtn">
+              <span>🔑</span> Sign In / Register Custom Account
+            </button>
+            <button class="dropdown-item text-danger" id="logoutBtn">
+              <span>🚪</span> Sign Out
+            </button>
+          </div>
         </div>
       </div>
     </div>
@@ -749,41 +767,115 @@
 
   <!-- Auth Modal -->
   <div class="modal-overlay hidden" id="authModal">
-    <div class="modal-dialog">
+    <div class="modal-dialog auth-dialog">
       <div class="modal-header">
-        <h3>🔐 User Authentication</h3>
+        <div class="modal-header-brand">
+          <span class="auth-icon">🔐</span>
+          <div>
+            <h3>BizIQ Authentication Portal</h3>
+            <p class="modal-subheading">Secure JWT HS256 Role-Based Access</p>
+          </div>
+        </div>
         <button class="modal-close-btn" id="closeAuthModalBtn">✕</button>
       </div>
+
       <div class="modal-body">
         <div class="auth-tabs">
-          <button class="auth-tab-btn active" id="authTabLogin">Login</button>
-          <button class="auth-tab-btn" id="authTabRegister">Register</button>
+          <button class="auth-tab-btn active" id="authTabLogin">
+            <span>🔑</span> Sign In
+          </button>
+          <button class="auth-tab-btn" id="authTabRegister">
+            <span>📝</span> Create Account
+          </button>
         </div>
 
-        <div id="authLoginForm">
-          <label for="loginEmail">Email:</label>
-          <input type="email" id="loginEmail" value="achini@biziq.com">
+        <div id="authStatusBanner" class="auth-banner hidden"></div>
 
-          <label for="loginPassword">Password:</label>
-          <input type="password" id="loginPassword" value="Achini123!">
+        <!-- SIGN IN FORM -->
+        <div id="authLoginForm" class="auth-form-panel">
+          <div class="form-group">
+            <label for="loginEmail">Email or Username</label>
+            <div class="input-with-icon">
+              <span class="input-icon">👤</span>
+              <input type="text" id="loginEmail" placeholder="e.g. achini@biziq.com or admin" value="achini@biziq.com" autocomplete="username">
+            </div>
+          </div>
 
-          <button class="primary-btn full-width" id="doLoginBtn" style="margin-top: 15px;">Login with JWT</button>
+          <div class="form-group">
+            <label for="loginPassword">Password</label>
+            <div class="input-with-icon">
+              <span class="input-icon">🔒</span>
+              <input type="password" id="loginPassword" placeholder="Enter your password" value="Achini123!" autocomplete="current-password">
+              <button type="button" class="pwd-toggle-btn" id="toggleLoginPwdBtn" title="Toggle password visibility">👁️</button>
+            </div>
+          </div>
+
+          <!-- Quick Demo Logins Bar -->
+          <div class="demo-logins-box">
+            <span class="demo-box-title">⚡ Quick Sign-In (Pre-Seeded Demo Accounts):</span>
+            <div class="demo-pills-row">
+              <button type="button" class="demo-pill" data-demo-email="achini@biziq.com" data-demo-pwd="Achini123!">
+                <span>👩‍💼</span> Achini (Analyst)
+              </button>
+              <button type="button" class="demo-pill" data-demo-email="admin@biziq.com" data-demo-pwd="Admin123!">
+                <span>🛡️</span> Admin
+              </button>
+              <button type="button" class="demo-pill" data-demo-email="owner@biziq.com" data-demo-pwd="Owner123!">
+                <span>💼</span> SME Owner
+              </button>
+              <button type="button" class="demo-pill" data-demo-email="analyst@biziq.com" data-demo-pwd="Analyst123!">
+                <span>📊</span> Analyst
+              </button>
+            </div>
+          </div>
+
+          <button class="primary-gradient-btn full-width" id="doLoginBtn" style="margin-top: 15px; justify-content: center; height: 42px;">
+            <span id="loginBtnText">Sign In with JWT</span>
+            <span class="btn-spinner hidden" id="loginSpinner"></span>
+          </button>
         </div>
 
-        <div id="authRegisterForm" class="hidden">
-          <label for="regFullName">Full Name:</label>
-          <input type="text" id="regFullName" placeholder="e.g. Jane Doe">
+        <!-- REGISTER FORM -->
+        <div id="authRegisterForm" class="auth-form-panel hidden">
+          <div class="form-row-2">
+            <div class="form-group">
+              <label for="regFullName">Full Name</label>
+              <input type="text" id="regFullName" placeholder="e.g. Jane Perera" class="form-input">
+            </div>
+            <div class="form-group">
+              <label for="regUsername">Username</label>
+              <input type="text" id="regUsername" placeholder="e.g. jperera" class="form-input">
+            </div>
+          </div>
 
-          <label for="regUsername">Username:</label>
-          <input type="text" id="regUsername" placeholder="e.g. janedoe">
+          <div class="form-row-2">
+            <div class="form-group">
+              <label for="regEmail">Email Address</label>
+              <input type="email" id="regEmail" placeholder="e.g. jane@biziq.com" class="form-input">
+            </div>
+            <div class="form-group">
+              <label for="regRole">Select Role</label>
+              <select id="regRole" class="form-select">
+                <option value="ANALYST">Business Analyst (Default)</option>
+                <option value="USER">SME Business Owner</option>
+                <option value="ADMIN">System Administrator</option>
+              </select>
+            </div>
+          </div>
 
-          <label for="regEmail">Email:</label>
-          <input type="email" id="regEmail" placeholder="e.g. jane@company.com">
+          <div class="form-group">
+            <label for="regPassword">Password</label>
+            <div class="input-with-icon">
+              <span class="input-icon">🔒</span>
+              <input type="password" id="regPassword" placeholder="Minimum 6 characters" class="form-input">
+              <button type="button" class="pwd-toggle-btn" id="toggleRegPwdBtn" title="Toggle password visibility">👁️</button>
+            </div>
+          </div>
 
-          <label for="regPassword">Password:</label>
-          <input type="password" id="regPassword" placeholder="StrongPassword123">
-
-          <button class="primary-btn full-width" id="doRegisterBtn" style="margin-top: 15px;">Create Account</button>
+          <button class="primary-gradient-btn full-width" id="doRegisterBtn" style="margin-top: 15px; justify-content: center; height: 42px;">
+            <span id="regBtnText">Create Account & Sign In</span>
+            <span class="btn-spinner hidden" id="regSpinner"></span>
+          </button>
         </div>
       </div>
     </div>
