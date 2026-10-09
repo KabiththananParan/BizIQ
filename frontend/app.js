@@ -1251,41 +1251,274 @@ async function checkSystemStatus() {
 // ============================================================================
 
 function initModals() {
-  // Datasource Modal
-  const dsModal = document.getElementById("addDataSourceModal") || document.getElementById("datasourceModal");
-  const closeDsBtn = document.getElementById("closeDatasourceModalBtn") || document.getElementById("closeDsModalBtn");
-  const cancelDsBtn = document.getElementById("cancelDatasourceBtn") || document.getElementById("cancelDsBtn");
-  const saveDsBtn = document.getElementById("saveDatasourceBtn") || document.getElementById("saveDataSourceBtn");
+  // Datasource Modal with Computer File Upload & Drag-and-Drop
+  initDatasourceModal();
 
-  if (closeDsBtn && dsModal) closeDsBtn.addEventListener("click", () => dsModal.classList.add("hidden"));
-  if (cancelDsBtn && dsModal) cancelDsBtn.addEventListener("click", () => dsModal.classList.add("hidden"));
+  // Report Modal
+  const repModal = document.getElementById("saveReportModal");
+  const closeRepBtn = document.getElementById("closeReportModalBtn");
+  const cancelRepBtn = document.getElementById("cancelReportBtn");
+  const saveRepBtn = document.getElementById("confirmSaveReportBtn");
 
-  if (saveDsBtn) {
-    saveDsBtn.addEventListener("click", async () => {
-      const name = document.getElementById("dsNameInput").value.trim();
-      const type = document.getElementById("dsTypeSelect").value;
-      const desc = document.getElementById("dsDescInput").value.trim();
-      const content = document.getElementById("dsContentInput").value.trim();
+  if (closeRepBtn && repModal) closeRepBtn.addEventListener("click", () => repModal.classList.add("hidden"));
+  if (cancelRepBtn && repModal) cancelRepBtn.addEventListener("click", () => repModal.classList.add("hidden"));
 
-      if (!name || !content) {
-        showToast("Please provide dataset name and content.", "error");
-        return;
-      }
+  if (saveRepBtn) {
+    saveRepBtn.addEventListener("click", async () => {
+      const title = document.getElementById("reportTitleInput").value.trim();
+      const notes = document.getElementById("reportNotesInput").value.trim();
 
+      if (!title || !state.currentInsight) return;
       try {
-        await authFetch(`${API_BASE}/api/v1/ir/datasources`, {
+        await authFetch(`${API_BASE}/api/v1/insight/reports`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ name, description: desc, content, source_type: type, owner: "demo" }),
+          body: JSON.stringify({
+            insight_id: state.currentInsight.id,
+            title: title,
+            notes: notes,
+            user_id: state.currentUser.id || "1",
+          }),
         });
-        if (dsModal) dsModal.classList.add("hidden");
-        loadDataSources();
-        showToast(`Data source "${name}" indexed!`, "success");
+        if (repModal) repModal.classList.add("hidden");
+        loadReports();
+        showToast("Executive report pinned & saved!", "success");
       } catch (e) {
-        showToast(`Save error: ${e.message}`, "error");
+        showToast(`Report error: ${e.message}`, "error");
       }
     });
   }
+
+  // Authentication Modal
+  initAuthModal();
+}
+
+function initDatasourceModal() {
+  const dsModal = document.getElementById("datasourceModal");
+  const closeDsBtn = document.getElementById("closeDatasourceModalBtn");
+  const cancelDsBtn = document.getElementById("cancelDatasourceBtn");
+  const saveDsBtn = document.getElementById("saveDatasourceBtn");
+  const tabUpload = document.getElementById("tabUploadFile");
+  const tabPaste = document.getElementById("tabPasteText");
+  const fileSection = document.getElementById("fileUploadSection");
+  const dropZone = document.getElementById("fileDropZone");
+  const fileInput = document.getElementById("dsFileInput");
+  const fileInfo = document.getElementById("uploadedFileInfo");
+  const fileNameEl = document.getElementById("uploadedFileName");
+  const fileSizeEl = document.getElementById("uploadedFileSize");
+  const fileStatsEl = document.getElementById("uploadedFileStats");
+  const fileIconEl = document.getElementById("fileTypeIcon");
+  const removeFileBtn = document.getElementById("removeFileBtn");
+  const contentInput = document.getElementById("dsContentInput");
+  const nameInput = document.getElementById("dsNameInput");
+  const typeSelect = document.getElementById("dsTypeSelect");
+  const descInput = document.getElementById("dsDescInput");
+  const charCounter = document.getElementById("contentCharCounter");
+  const saveSpinner = document.getElementById("saveDsSpinner");
+  const saveBtnText = document.getElementById("saveDsBtnText");
+
+  if (!dsModal) return;
+
+  // Close handlers
+  if (closeDsBtn) closeDsBtn.addEventListener("click", () => dsModal.classList.add("hidden"));
+  if (cancelDsBtn) cancelDsBtn.addEventListener("click", () => dsModal.classList.add("hidden"));
+  dsModal.addEventListener("click", (e) => {
+    if (e.target === dsModal) dsModal.classList.add("hidden");
+  });
+
+  // Mode tab switching
+  if (tabUpload && tabPaste) {
+    tabUpload.addEventListener("click", () => {
+      tabUpload.classList.add("active");
+      tabPaste.classList.remove("active");
+      if (fileSection) fileSection.classList.remove("hidden");
+    });
+    tabPaste.addEventListener("click", () => {
+      tabPaste.classList.add("active");
+      tabUpload.classList.remove("active");
+      if (fileSection) fileSection.classList.add("hidden");
+    });
+  }
+
+  // File Dropzone interactions
+  if (dropZone && fileInput) {
+    dropZone.addEventListener("click", () => fileInput.click());
+
+    ["dragenter", "dragover"].forEach(eventName => {
+      dropZone.addEventListener(eventName, (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        dropZone.classList.add("drag-over");
+      });
+    });
+
+    ["dragleave", "drop"].forEach(eventName => {
+      dropZone.addEventListener(eventName, (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        dropZone.classList.remove("drag-over");
+      });
+    });
+
+    dropZone.addEventListener("drop", (e) => {
+      const dt = e.dataTransfer;
+      const files = dt ? dt.files : null;
+      if (files && files.length > 0) {
+        handleDatasetFile(files[0]);
+      }
+    });
+
+    fileInput.addEventListener("change", () => {
+      if (fileInput.files && fileInput.files.length > 0) {
+        handleDatasetFile(fileInput.files[0]);
+      }
+    });
+  }
+
+  function handleDatasetFile(file) {
+    if (!file) return;
+
+    // Show file badge
+    if (fileInfo) fileInfo.classList.remove("hidden");
+    if (fileNameEl) fileNameEl.textContent = file.name;
+    if (fileSizeEl) fileSizeEl.textContent = `${(file.size / 1024).toFixed(1)} KB`;
+
+    // Pick icon
+    const isCsv = file.name.endsWith(".csv") || file.name.endsWith(".tsv");
+    const isJson = file.name.endsWith(".json");
+    if (fileIconEl) fileIconEl.textContent = isCsv ? "📊" : (isJson ? "{}" : "📝");
+
+    // Read content
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const text = event.target.result || "";
+      if (contentInput) {
+        contentInput.value = text;
+        updateContentStats(text);
+      }
+
+      // Auto-populate Title if empty
+      if (nameInput && (!nameInput.value.trim() || nameInput.dataset.autoFilled)) {
+        const cleanName = file.name.replace(/\.[^/.]+$/, "").replace(/[_\-\.]+/g, " ");
+        nameInput.value = cleanName.charAt(0).toUpperCase() + cleanName.slice(1);
+        nameInput.dataset.autoFilled = "true";
+      }
+
+      // Auto-populate Format
+      if (typeSelect) {
+        typeSelect.value = (isCsv || (text.split("\n")[0] && text.split("\n")[0].includes(","))) ? "csv" : "text";
+      }
+
+      // Auto-detect description if empty
+      if (descInput && !descInput.value.trim()) {
+        descInput.value = `Imported from ${file.name} (${(file.size / 1024).toFixed(1)} KB)`;
+      }
+
+      // Calculate row stats
+      const lines = text.trim().split("\n").filter(l => l.trim().length > 0);
+      if (fileStatsEl) {
+        if (isCsv && lines.length > 0) {
+          const colCount = lines[0].split(",").length;
+          fileStatsEl.textContent = `${lines.length - 1} data rows • ${colCount} cols`;
+        } else {
+          fileStatsEl.textContent = `${lines.length} lines parsed`;
+        }
+      }
+
+      showToast(`Loaded ${file.name} successfully!`, "success");
+    };
+
+    reader.onerror = () => {
+      showToast("Error reading file from computer", "error");
+    };
+
+    reader.readAsText(file);
+  }
+
+  // Remove attached file
+  if (removeFileBtn) {
+    removeFileBtn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      if (fileInput) fileInput.value = "";
+      if (fileInfo) fileInfo.classList.add("hidden");
+      if (contentInput) contentInput.value = "";
+      if (nameInput && nameInput.dataset.autoFilled) nameInput.value = "";
+      if (charCounter) charCounter.textContent = "0 lines";
+      showToast("File detached", "info");
+    });
+  }
+
+  // Live content stats counter
+  if (contentInput) {
+    contentInput.addEventListener("input", () => {
+      updateContentStats(contentInput.value);
+    });
+  }
+
+  function updateContentStats(text) {
+    if (!charCounter) return;
+    const lines = text ? text.split("\n").length : 0;
+    const kb = text ? (text.length / 1024).toFixed(1) : "0.0";
+    charCounter.textContent = `${lines} lines • ${kb} KB`;
+  }
+
+  // Save / Index action
+  if (saveDsBtn) {
+    saveDsBtn.addEventListener("click", async () => {
+      const name = nameInput ? nameInput.value.trim() : "";
+      const type = typeSelect ? typeSelect.value : "csv";
+      const desc = descInput ? descInput.value.trim() : "";
+      const content = contentInput ? contentInput.value.trim() : "";
+
+      if (!name || !content) {
+        showToast("Please provide dataset title and content.", "error");
+        return;
+      }
+
+      if (saveSpinner) saveSpinner.classList.remove("hidden");
+      if (saveBtnText) saveBtnText.textContent = "Indexing Corpus...";
+      saveDsBtn.disabled = true;
+
+      try {
+        const res = await authFetch(`${API_BASE}/api/v1/ir/datasources`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            name: name,
+            description: desc,
+            content: content,
+            source_type: type,
+            owner: "demo",
+          }),
+        });
+
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({ detail: "Failed to save dataset" }));
+          throw new Error(err.detail || "Indexing failed");
+        }
+
+        dsModal.classList.add("hidden");
+        // Reset inputs
+        if (fileInput) fileInput.value = "";
+        if (fileInfo) fileInfo.classList.add("hidden");
+        if (nameInput) nameInput.value = "";
+        if (descInput) descInput.value = "";
+        if (contentInput) contentInput.value = "";
+        if (charCounter) charCounter.textContent = "0 lines";
+
+        loadDataSources();
+        showToast(`Dataset "${name}" successfully indexed into IR Vault!`, "success");
+      } catch (e) {
+        showToast(`Dataset indexing error: ${e.message}`, "error");
+      } finally {
+        if (saveSpinner) saveSpinner.classList.add("hidden");
+        if (saveBtnText) saveBtnText.textContent = "⚡ Index Dataset in Vault";
+        saveDsBtn.disabled = false;
+      }
+    });
+  }
+}
+
 
   // Report Modal
   const repModal = document.getElementById("saveReportModal");

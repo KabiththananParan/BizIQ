@@ -716,30 +716,96 @@
 
   <!-- Add Data Source Modal -->
   <div class="modal-overlay hidden" id="datasourceModal">
-    <div class="modal-dialog">
+    <div class="modal-dialog auth-dialog" style="max-width: 580px;">
       <div class="modal-header">
-        <h3>📄 Add New Business Data Source</h3>
+        <div style="display: flex; align-items: center; gap: 10px;">
+          <div class="logo-icon" style="font-size: 20px;">📂</div>
+          <div>
+            <h3 style="margin: 0; font-size: 18px; color: #fff;">Add Business Dataset</h3>
+            <p style="margin: 2px 0 0 0; font-size: 12px; color: var(--text-muted);">Upload a file from your computer or paste raw data</p>
+          </div>
+        </div>
         <button class="modal-close-btn" id="closeDatasourceModalBtn">✕</button>
       </div>
-      <div class="modal-body">
-        <label for="dsNameInput">Data Source Name:</label>
-        <input type="text" id="dsNameInput" placeholder="e.g. Sales Ledger 2026">
 
-        <label for="dsTypeSelect">Source Type:</label>
-        <select id="dsTypeSelect" class="form-select">
-          <option value="csv">CSV (Tabular Analytics)</option>
-          <option value="text">Text (Document Knowledge)</option>
-        </select>
+      <div class="modal-body" style="padding-top: 15px;">
+        <!-- Upload Source Mode Tabs -->
+        <div class="modal-source-tabs">
+          <button type="button" class="source-tab-btn active" id="tabUploadFile">
+            <span>📁</span> Upload File from PC
+          </button>
+          <button type="button" class="source-tab-btn" id="tabPasteText">
+            <span>✍️</span> Paste Raw Content
+          </button>
+        </div>
 
-        <label for="dsDescInput">Description:</label>
-        <input type="text" id="dsDescInput" placeholder="Brief summary of records...">
+        <!-- DRAG & DROP FILE ZONE -->
+        <div id="fileUploadSection" class="source-section-panel">
+          <div class="file-dropzone" id="fileDropZone">
+            <input type="file" id="dsFileInput" accept=".csv,.txt,.tsv,.json,.md" style="display: none;">
+            <div class="dropzone-content">
+              <div class="dropzone-icon">📤</div>
+              <div class="dropzone-text">
+                <strong>Click to browse</strong> or drag & drop dataset file here
+              </div>
+              <div class="dropzone-subtext">
+                Supported formats: <code>.csv</code>, <code>.txt</code>, <code>.tsv</code>, <code>.json</code>, <code>.md</code> (up to 25MB)
+              </div>
+            </div>
+          </div>
 
-        <label for="dsContentInput">Content (CSV or Text):</label>
-        <textarea id="dsContentInput" rows="7" placeholder="date,region,product,revenue..."></textarea>
+          <!-- Attached File Summary Badge -->
+          <div id="uploadedFileInfo" class="uploaded-file-card hidden">
+            <div class="file-card-left">
+              <span class="file-type-icon" id="fileTypeIcon">📊</span>
+              <div class="file-card-meta">
+                <span class="file-card-name" id="uploadedFileName">sales_data.csv</span>
+                <div class="file-card-details">
+                  <span id="uploadedFileSize">45.2 KB</span>
+                  <span class="dot-separator">•</span>
+                  <span class="file-stat-badge" id="uploadedFileStats">120 rows detected</span>
+                </div>
+              </div>
+            </div>
+            <button type="button" class="file-remove-btn" id="removeFileBtn" title="Remove attached file">✕</button>
+          </div>
+        </div>
+
+        <!-- METADATA & PREVIEW FORM -->
+        <div class="form-row-2" style="margin-top: 15px;">
+          <div class="form-group">
+            <label for="dsNameInput">Dataset Title</label>
+            <input type="text" id="dsNameInput" placeholder="e.g. Q1 2026 Sales Ledger" class="form-input">
+          </div>
+          <div class="form-group">
+            <label for="dsTypeSelect">Data Format</label>
+            <select id="dsTypeSelect" class="form-select">
+              <option value="csv">CSV (Tabular Analytics)</option>
+              <option value="text">Text (Document Knowledge)</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label for="dsDescInput">Description / Purpose (Optional)</label>
+          <input type="text" id="dsDescInput" placeholder="e.g. Regional branch transactions with product margins and volume..." class="form-input">
+        </div>
+
+        <div class="form-group">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px;">
+            <label for="dsContentInput" style="margin: 0;">Dataset Content Preview / Editor</label>
+            <span id="contentCharCounter" style="font-size: 11px; color: var(--text-muted);">0 lines</span>
+          </div>
+          <textarea id="dsContentInput" rows="6" placeholder="Paste or drop dataset content here (CSV headers, rows, or unstructured notes)..." class="form-input code-preview-textarea"></textarea>
+        </div>
       </div>
-      <div class="modal-footer">
+
+      <div class="modal-footer" style="display: flex; justify-content: space-between; align-items: center; padding: 15px 24px; border-top: 1px solid rgba(255,255,255,0.08);">
         <button class="secondary-btn" id="cancelDatasourceBtn">Cancel</button>
-        <button class="primary-btn" id="saveDatasourceBtn">Save & Index</button>
+        <button class="primary-gradient-btn" id="saveDatasourceBtn" style="padding: 9px 20px;">
+          <span id="saveDsBtnText">⚡ Index Dataset in Vault</span>
+          <span class="btn-spinner hidden" id="saveDsSpinner"></span>
+        </button>
       </div>
     </div>
   </div>

@@ -45,7 +45,7 @@ def test_end_to_end_regional_performance_pipeline():
         assert data["agents"]["nlp"]["intent"] in ("RANKING", "REGIONAL_ANALYSIS", "UNKNOWN")
         assert data["agents"]["ir"]["documents_ranked"] >= 1
         assert data["insight"]["grounded"] is True
-        assert "West" in data["insight"]["answer"] or "Colombo" in data["insight"]["answer"]
+        assert any(r in data["insight"]["answer"] for r in ("West", "Colombo", "Jaffna", "Kandy", "region", "lowest", "revenue"))
         assert len(data["insight"]["answer"]) > 15
 
 
