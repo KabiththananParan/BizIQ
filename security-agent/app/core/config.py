@@ -8,6 +8,13 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+SERVICE_TOKEN_ENV = {
+    "nlp-agent": "BIZIQ_SERVICE_TOKEN_NLP_AGENT",
+    "ir-agent": "BIZIQ_SERVICE_TOKEN_IR_AGENT",
+    "insight-agent": "BIZIQ_SERVICE_TOKEN_INSIGHT_AGENT",
+    "security-agent": "BIZIQ_SERVICE_TOKEN_SECURITY_AGENT",
+}
+
 
 @dataclass
 class Settings:
@@ -27,6 +34,11 @@ class Settings:
     login_frequency_threshold: int = field(default_factory=lambda: int(os.getenv("LOGIN_FREQUENCY_THRESHOLD", "10")))
     groq_api_key: str | None = field(default_factory=lambda: os.getenv("GROQ_API_KEY"))
     groq_model: str = field(default_factory=lambda: os.getenv("GROQ_MODEL", "openai/gpt-oss-20b"))
+    service_tokens: dict[str, str | None] = field(
+        default_factory=lambda: {
+            agent: os.getenv(variable) for agent, variable in SERVICE_TOKEN_ENV.items()
+        }
+    )
 
 
 settings = Settings()

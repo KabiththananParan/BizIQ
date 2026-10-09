@@ -64,6 +64,11 @@ Ensure `API_BASE_URL` points to your running FastAPI server:
 API_BASE_URL=http://localhost:8003
 ```
 
+The validation console also requires the server-side
+`BIZIQ_SERVICE_TOKEN_SECURITY_AGENT` credential to match the Security backend
+configuration. Set it in the frontend process environment or its local ignored
+`.env` file. The token is not rendered or stored in Streamlit session state.
+
 ---
 
 ### 3. Launching the Streamlit Application

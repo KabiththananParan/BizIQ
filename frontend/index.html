@@ -1,0 +1,798 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>BizIQ — Agentic AI Business Intelligence Assistant</title>
+  <meta name="description" content="Ask your business data questions in plain English. Get data-grounded answers in seconds with multi-agent AI.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@500;600;700;800&family=Fira+Code:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+  <!-- Chart.js CDN for interactive visual analytics -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+</head>
+<body class="dark-theme">
+  <!-- Top Navigation Header -->
+  <header class="app-header">
+    <div class="header-left">
+      <div class="brand-container">
+        <div class="brand-logo">
+          <span class="logo-icon">🧠</span>
+          <div class="logo-glow"></div>
+        </div>
+        <div class="brand-text">
+          <div class="brand-title-row">
+            <h1 class="brand-title">BizIQ</h1>
+            <span class="badge-agentic">MULTI-AGENT AI</span>
+          </div>
+          <p class="brand-subtitle">Business Intelligence Assistant for SMEs</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Agent Live Heartbeats -->
+    <div class="header-center">
+      <div class="agent-cluster-pills" id="agentClusterPills">
+        <div class="agent-pill active" id="pillNlp" title="Member 1: NLP Query Agent">
+          <span class="pulse-dot green"></span>
+          <span class="agent-name">🗣️ NLP Agent</span>
+        </div>
+        <div class="agent-pill active" id="pillIr" title="Member 2: Data Retrieval Agent">
+          <span class="pulse-dot green"></span>
+          <span class="agent-name">🔎 IR Agent</span>
+        </div>
+        <div class="agent-pill active" id="pillInsight" title="Member 3: LLM Insight Agent">
+          <span class="pulse-dot green"></span>
+          <span class="agent-name">🧠 Insight Agent</span>
+        </div>
+        <div class="agent-pill active" id="pillSecurity" title="Member 4: Security & Compliance Agent">
+          <span class="pulse-dot green"></span>
+          <span class="agent-name">🔐 Security Agent</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- User & Auth Menu -->
+    <div class="header-right">
+      <div class="user-switcher-dropdown">
+        <div class="active-user-card" id="activeUserBtn">
+          <div class="user-avatar" id="userAvatar">A</div>
+          <div class="user-meta">
+            <span class="user-name" id="currentUserName">Achini</span>
+            <span class="user-role-badge analyst" id="currentUserRole">ANALYST</span>
+          </div>
+          <span class="chevron-icon">⌄</span>
+        </div>
+        <div class="user-dropdown-menu hidden" id="userDropdownMenu">
+          <div class="dropdown-header">Quick Role Switcher</div>
+          <button class="dropdown-item" data-user="achini" data-role="analyst" data-name="Achini (Lead Analyst)">
+            <span>👩‍💼</span> Achini (Lead Analyst)
+          </button>
+          <button class="dropdown-item" data-user="admin" data-role="admin" data-name="System Administrator">
+            <span>🛡️</span> Admin (Security Admin)
+          </button>
+          <button class="dropdown-item" data-user="sme_owner" data-role="user" data-name="SME Business Owner">
+            <span>💼</span> SME Business Owner (User)
+          </button>
+          <div class="dropdown-divider"></div>
+          <button class="dropdown-item" id="openAuthModalBtn">
+            <span>🔑</span> Login / Register Custom Account
+          </button>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Application Layout -->
+  <div class="app-layout">
+    <!-- Sidebar Navigation -->
+    <nav class="app-sidebar">
+      <div class="nav-section-title">PLATFORM MODULES</div>
+      <button class="nav-tab-btn active" data-tab="tab-query-hub">
+        <span class="nav-icon">💡</span>
+        <span class="nav-text">Ask BizIQ (AI Hub)</span>
+        <span class="nav-indicator"></span>
+      </button>
+
+      <button class="nav-tab-btn" data-tab="tab-nlp-lab">
+        <span class="nav-icon">🗣️</span>
+        <span class="nav-text">NLP Query Agent</span>
+        <span class="nav-badge">Member 1</span>
+      </button>
+
+      <button class="nav-tab-btn" data-tab="tab-ir-vault">
+        <span class="nav-icon">🔎</span>
+        <span class="nav-text">Data Retrieval (IR)</span>
+        <span class="nav-badge">Member 2</span>
+      </button>
+
+      <button class="nav-tab-btn" data-tab="tab-insight-reports">
+        <span class="nav-icon">📊</span>
+        <span class="nav-text">Insights & Reports</span>
+        <span class="nav-badge">Member 3</span>
+      </button>
+
+      <button class="nav-tab-btn" data-tab="tab-security-center">
+        <span class="nav-icon">🔐</span>
+        <span class="nav-text">Security & Audit</span>
+        <span class="nav-badge">Member 4</span>
+      </button>
+
+      <div class="nav-section-title">ARCHITECTURE</div>
+      <button class="nav-tab-btn" data-tab="tab-architecture">
+        <span class="nav-icon">⚡</span>
+        <span class="nav-text">Multi-Agent Diagnostics</span>
+      </button>
+
+      <div class="sidebar-footer">
+        <div class="academic-badge">
+          <span>IRWA IT3041</span>
+          <strong>BizIQ v1.0</strong>
+        </div>
+      </div>
+    </nav>
+
+    <!-- Content Workspace -->
+    <main class="app-main-content">
+
+      <!-- ================================================================= -->
+      <!-- TAB 1: ASK BIZIQ (AI QUERY HUB) -->
+      <!-- ================================================================= -->
+      <section class="tab-content-panel active" id="tab-query-hub">
+        <div class="hub-grid-layout">
+          <!-- Main Query Column -->
+          <div class="hub-main-column">
+            <!-- Query Input Card -->
+            <div class="glass-card query-card">
+              <div class="card-glow-edge"></div>
+              <div class="card-header-flex">
+                <div class="card-title-group">
+                  <div class="header-icon-box">🤖</div>
+                  <div>
+                    <h2 class="section-heading">Ask BizIQ Intelligence</h2>
+                    <p class="section-desc">Type your business question in plain English. Grounded by retrieved SME data.</p>
+                  </div>
+                </div>
+                <div class="top-k-selector">
+                  <label for="topKSlider">Evidence Top-K:</label>
+                  <span id="topKValue" class="slider-badge">5</span>
+                  <input type="range" id="topKSlider" min="1" max="10" value="5" step="1">
+                </div>
+              </div>
+
+              <!-- Question Textarea & Submit -->
+              <div class="query-input-wrapper">
+                <textarea id="hubQuestionInput" rows="2" placeholder="e.g. Which region underperformed last quarter and why?"></textarea>
+                <div class="input-actions-bar">
+                  <div class="input-hint">Press <kbd>Ctrl</kbd> + <kbd>Enter</kbd> to ask</div>
+                  <button id="hubAskBtn" class="primary-gradient-btn" type="button">
+                    <span class="btn-spinner hidden" id="askSpinner"></span>
+                    <span id="askBtnLabel">✨ Ask Multi-Agent AI</span>
+                  </button>
+                </div>
+              </div>
+
+              <!-- Example Prompt Chips -->
+              <div class="example-prompts-bar">
+                <span class="examples-label">Try asking:</span>
+                <div class="chips-scroll-container">
+                  <button class="prompt-chip" type="button" data-prompt="Which region underperformed last quarter and why?">
+                    📉 West region Q3 underperformance
+                  </button>
+                  <button class="prompt-chip" type="button" data-prompt="Compare sales between Colombo and Kandy">
+                    ⚖️ Colombo vs Kandy comparison
+                  </button>
+                  <button class="prompt-chip" type="button" data-prompt="Forecast sales for next 3 months">
+                    📈 Forecast next quarter sales
+                  </button>
+                  <button class="prompt-chip" type="button" data-prompt="What were the total sales in Colombo in December?">
+                    💰 Colombo December peak sales
+                  </button>
+                  <button class="prompt-chip" type="button" data-prompt="Which product generated the highest revenue and profit margin?">
+                    🏆 Top product by revenue & margin
+                  </button>
+                  <button class="prompt-chip" type="button" data-prompt="Summarize operational delivery delays by branch">
+                    🚚 Branch delayed order logs
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <!-- Live Execution Pipeline Visualizer -->
+            <div class="glass-card pipeline-visualizer-card" id="pipelineCard">
+              <div class="pipeline-header">
+                <div class="pipeline-title">
+                  <span class="icon-gear">⚙️</span>
+                  <h3>Live Multi-Agent Execution Flow</h3>
+                </div>
+                <div class="pipeline-timer" id="pipelineTimer">Ready</div>
+              </div>
+              <div class="pipeline-stepper" id="pipelineStepper">
+                <div class="step-card" id="stepSec">
+                  <div class="step-icon">🔐</div>
+                  <div class="step-info">
+                    <span class="step-label">Step 1: Security Agent</span>
+                    <strong class="step-status">RBAC & Audit</strong>
+                  </div>
+                  <div class="step-timing" id="timeSec">—</div>
+                </div>
+                <div class="step-connector"></div>
+                <div class="step-card" id="stepNlp">
+                  <div class="step-icon">🗣️</div>
+                  <div class="step-info">
+                    <span class="step-label">Step 2: NLP Query Agent</span>
+                    <strong class="step-status">Intent & NER</strong>
+                  </div>
+                  <div class="step-timing" id="timeNlp">—</div>
+                </div>
+                <div class="step-connector"></div>
+                <div class="step-card" id="stepIr">
+                  <div class="step-icon">🔎</div>
+                  <div class="step-info">
+                    <span class="step-label">Step 3: IR Agent</span>
+                    <strong class="step-status">TF-IDF Retrieval</strong>
+                  </div>
+                  <div class="step-timing" id="timeIr">—</div>
+                </div>
+                <div class="step-connector"></div>
+                <div class="step-card" id="stepInsight">
+                  <div class="step-icon">🧠</div>
+                  <div class="step-info">
+                    <span class="step-label">Step 4: Insight Agent</span>
+                    <strong class="step-status">Analytics & Reasoning</strong>
+                  </div>
+                  <div class="step-timing" id="timeInsight">—</div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Grounded AI Insight Response Card -->
+            <div class="glass-card result-card hidden" id="resultCard">
+              <div class="result-header">
+                <div class="result-badge-group">
+                  <div class="grounding-badge" id="groundingBadge">
+                    <span class="badge-icon">✅</span>
+                    <span class="badge-text">100% Data Grounded</span>
+                  </div>
+                  <div class="confidence-pill" id="confidencePill">High Confidence</div>
+                  <div class="model-pill" id="modelPill">AI Reasoning Engine</div>
+                </div>
+                <div class="result-actions">
+                  <button class="action-btn" id="pinToReportBtn" title="Save as Executive Report">📌 Save to Report</button>
+                  <button class="action-btn" id="copyAnswerBtn" title="Copy answer to clipboard">📋 Copy</button>
+                </div>
+              </div>
+
+              <!-- Executive Summary Answer -->
+              <div class="executive-answer-box" id="executiveAnswerBox">
+                <div class="answer-text" id="answerText"></div>
+              </div>
+
+              <!-- Key Findings Pill Grid -->
+              <div class="key-findings-section" id="keyFindingsSection">
+                <h4>🎯 Key Findings & Strategic Insights:</h4>
+                <ul class="findings-list" id="findingsList"></ul>
+              </div>
+
+              <!-- KPI Metrics Quick Grid -->
+              <div class="kpi-metrics-grid" id="kpiGrid"></div>
+
+              <!-- Dynamic Chart Container -->
+              <div class="chart-wrapper-card" id="chartWrapper">
+                <div class="chart-header">
+                  <h4 id="chartTitle">📊 Statistical Visualization</h4>
+                  <span class="chart-subtitle">Computed with Pandas Analytics Engine</span>
+                </div>
+                <div class="canvas-container">
+                  <canvas id="biziqAnalyticsChart"></canvas>
+                </div>
+              </div>
+
+              <!-- Expandable Step-by-Step Transparent Reasoning -->
+              <details class="reasoning-accordion">
+                <summary class="reasoning-summary">
+                  <span>🧠 Explainable AI Reasoning Steps & Assumptions</span>
+                  <span class="accordion-arrow">▼</span>
+                </summary>
+                <div class="reasoning-body">
+                  <h5>Execution Logic:</h5>
+                  <ol id="reasoningStepsList" class="steps-ordered-list"></ol>
+                  <h5>Assumptions & Limitations:</h5>
+                  <p id="assumptionsText" class="assumptions-box"></p>
+                </div>
+              </details>
+
+              <!-- Retrieved Evidence Citations Table -->
+              <details class="evidence-accordion">
+                <summary class="evidence-summary">
+                  <span>🔎 Supporting Evidence & Retrieved Records (<span id="evidenceCount">0</span> sources)</span>
+                  <span class="accordion-arrow">▼</span>
+                </summary>
+                <div class="evidence-body">
+                  <div class="table-responsive">
+                    <table class="evidence-table">
+                      <thead>
+                        <tr>
+                          <th>Data Source</th>
+                          <th>Relevance (Cosine)</th>
+                          <th>Matched Keywords</th>
+                          <th>Passage Snippet Preview</th>
+                        </tr>
+                      </thead>
+                      <tbody id="evidenceTableBody"></tbody>
+                    </table>
+                  </div>
+                </div>
+              </details>
+
+              <!-- Feedback Widget -->
+              <div class="feedback-footer">
+                <span>Was this insight helpful?</span>
+                <button class="feedback-btn" id="feedbackYesBtn">👍 Yes</button>
+                <button class="feedback-btn" id="feedbackNoBtn">👎 No</button>
+                <span class="feedback-status" id="feedbackStatus"></span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Question History Sidebar Column -->
+          <aside class="hub-sidebar-column">
+            <div class="glass-card history-card">
+              <div class="history-header">
+                <div class="history-title">
+                  <span class="icon-clock">🕘</span>
+                  <h3>Saved Questions</h3>
+                </div>
+                <button class="icon-action-btn" id="refreshHistoryBtn" title="Refresh list">↻</button>
+              </div>
+
+              <div class="history-search-box">
+                <span class="search-lens">⌕</span>
+                <input type="text" id="historySearchInput" placeholder="Filter questions...">
+              </div>
+
+              <div class="history-list-scroll" id="historyListContainer">
+                <div class="history-placeholder">Loading questions...</div>
+              </div>
+
+              <div class="history-footer">
+                <span>Total queries: <strong id="totalQueryCount">0</strong></span>
+                <button class="link-btn" id="clearAllQueriesBtn">Clear</button>
+              </div>
+            </div>
+          </aside>
+        </div>
+      </section>
+
+
+      <!-- ================================================================= -->
+      <!-- TAB 2: NLP QUERY AGENT LAB (MEMBER 1) -->
+      <!-- ================================================================= -->
+      <section class="tab-content-panel" id="tab-nlp-lab">
+        <div class="panel-header">
+          <div class="panel-title-group">
+            <div class="header-icon-box">🗣️</div>
+            <div>
+              <h2>NLP Query Agent (Member 1)</h2>
+              <p>Natural Language Processing, Intent Classification, Named Entity Recognition & Summarization.</p>
+            </div>
+          </div>
+          <div class="panel-actions">
+            <button class="secondary-btn" id="btnNlpReload">↻ Refresh Tables</button>
+          </div>
+        </div>
+
+        <div class="two-col-grid">
+          <!-- NLP Interactive Inspector -->
+          <div class="glass-card">
+            <h3>🔬 Interactive NLP Inspector</h3>
+            <p class="subtext">Test intent classification and entity tagging live.</p>
+            <div class="nlp-test-row">
+              <input type="text" id="nlpTestInput" value="Compare sales between Colombo and Kandy in Q3" placeholder="Type a test business question...">
+              <button class="primary-btn" id="nlpRunTestBtn">Analyze Text</button>
+            </div>
+
+            <div class="nlp-results-grid" id="nlpLiveResults">
+              <div class="analysis-card">
+                <span class="analysis-label">Normalized Input:</span>
+                <div class="analysis-value" id="nlpNormValue">—</div>
+              </div>
+              <div class="analysis-card">
+                <span class="analysis-label">Classified Intent:</span>
+                <div class="analysis-value intent-tag" id="nlpIntentValue">—</div>
+              </div>
+              <div class="analysis-card full-width">
+                <span class="analysis-label">Extracted Named Entities (NER):</span>
+                <div class="entity-chips-box" id="nlpEntitiesBox">—</div>
+              </div>
+              <div class="analysis-card full-width">
+                <span class="analysis-label">Structured IR Contract:</span>
+                <pre class="json-code-box" id="nlpStructuredQueryBox">{}</pre>
+              </div>
+            </div>
+          </div>
+
+          <!-- NLP Queries Table -->
+          <div class="glass-card">
+            <h3>📋 Queries Database (CRUD)</h3>
+            <p class="subtext">Inspect, edit, and manage all parsed questions in SQLite.</p>
+            <div class="table-responsive" style="max-height: 400px; overflow-y: auto;">
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th>ID</th>
+                    <th>Question</th>
+                    <th>Intent</th>
+                    <th>Entities</th>
+                    <th>Action</th>
+                  </tr>
+                </thead>
+                <tbody id="nlpQueriesTableBody">
+                  <tr><td colspan="5" class="table-loading">Loading queries...</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </section>
+
+
+      <!-- ================================================================= -->
+      <!-- TAB 3: DATA RETRIEVAL / IR AGENT (MEMBER 2) -->
+      <!-- ================================================================= -->
+      <section class="tab-content-panel" id="tab-ir-vault">
+        <div class="panel-header">
+          <div class="panel-title-group">
+            <div class="header-icon-box">🔎</div>
+            <div>
+              <h2>Information Retrieval (IR) Agent (Member 2)</h2>
+              <p>TF-IDF Indexing, Cosine Similarity Ranking, Business Knowledge Base & Data Sources CRUD.</p>
+            </div>
+          </div>
+          <div class="panel-actions">
+            <button class="primary-btn" id="openNewDatasourceModalBtn">+ Add Data Source</button>
+            <button class="secondary-btn" id="btnReSeedDemoData">⚡ Load Sample SME Datasets</button>
+          </div>
+        </div>
+
+        <div class="two-col-grid">
+          <!-- Active Data Sources List -->
+          <div class="glass-card">
+            <h3>📚 Active Business Datasets & Knowledge Documents</h3>
+            <p class="subtext">Data sources indexed for vector ranking and analytics.</p>
+            <div class="datasources-grid" id="datasourcesContainer">
+              <div class="loading-state">Loading data sources...</div>
+            </div>
+          </div>
+
+          <!-- Live TF-IDF Search Testbench -->
+          <div class="glass-card">
+            <h3>🎯 TF-IDF Cosine Search Testbench</h3>
+            <p class="subtext">Simulate IR Agent document retrieval and snippet scoring.</p>
+            <div class="search-bench-row">
+              <input type="text" id="irSearchTestInput" value="West region sales Q3 distributor" placeholder="Search keywords...">
+              <button class="primary-btn" id="irRunSearchBtn">Search Index</button>
+            </div>
+
+            <div class="search-results-container" id="irSearchResultsContainer">
+              <div class="empty-state">Run a search to see TF-IDF ranked documents.</div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+
+      <!-- ================================================================= -->
+      <!-- TAB 4: INSIGHTS & EXECUTIVE REPORTS (MEMBER 3) -->
+      <!-- ================================================================= -->
+      <section class="tab-content-panel" id="tab-insight-reports">
+        <div class="panel-header">
+          <div class="panel-title-group">
+            <div class="header-icon-box">📊</div>
+            <div>
+              <h2>LLM Insight Agent & Executive Reports (Member 3)</h2>
+              <p>Grounded Business Insights, Pandas Analytics, Holt Time-Series Forecasting & Reports CRUD.</p>
+            </div>
+          </div>
+          <div class="panel-actions">
+            <button class="secondary-btn" id="btnRefreshReports">↻ Refresh</button>
+          </div>
+        </div>
+
+        <div class="two-col-grid">
+          <!-- Reports Studio (CRUD) -->
+          <div class="glass-card">
+            <h3>📌 Pinned & Executive Reports</h3>
+            <p class="subtext">Manage saved executive reports and business insights.</p>
+            <div class="reports-list-container" id="reportsListContainer">
+              <div class="loading-state">Loading reports...</div>
+            </div>
+          </div>
+
+          <!-- Insight Payload Inspector -->
+          <div class="glass-card">
+            <h3>🔬 Insight Inspector & Payload History</h3>
+            <p class="subtext">Browse past insights and examine verification attributes.</p>
+            <div class="insights-history-list" id="insightsHistoryList">
+              <div class="loading-state">Loading insight history...</div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+
+      <!-- ================================================================= -->
+      <!-- TAB 5: SECURITY & COMPLIANCE CENTER (MEMBER 4) -->
+      <!-- ================================================================= -->
+      <section class="tab-content-panel" id="tab-security-center">
+        <div class="panel-header">
+          <div class="panel-title-group">
+            <div class="header-icon-box">🔐</div>
+            <div>
+              <h2>Security & Compliance Agent (Member 4)</h2>
+              <p>JWT Authentication, Role-Based Access Control (RBAC), Audit Trails & AI Anomaly Detection.</p>
+            </div>
+          </div>
+          <div class="panel-actions">
+            <button class="secondary-btn" id="btnRefreshSecurity">↻ Refresh Logs</button>
+          </div>
+        </div>
+
+        <!-- Security Metrics Summary Bar -->
+        <div class="security-metrics-row">
+          <div class="sec-metric-card">
+            <div class="metric-title">TOTAL USERS</div>
+            <div class="metric-val" id="secTotalUsers">4</div>
+            <span class="metric-sub">Admin, Analyst, User</span>
+          </div>
+          <div class="sec-metric-card">
+            <div class="metric-title">AUDIT EVENTS</div>
+            <div class="metric-val" id="secTotalAudits">0</div>
+            <span class="metric-sub">100% Traceability</span>
+          </div>
+          <div class="sec-metric-card">
+            <div class="metric-title">SECURITY STATUS</div>
+            <div class="metric-val green">SECURE</div>
+            <span class="metric-sub">RBAC Enforced</span>
+          </div>
+          <div class="sec-metric-card">
+            <div class="metric-title">ANOMALY RISK</div>
+            <div class="metric-val green" id="secRiskLevel">LOW (0/100)</div>
+            <span class="metric-sub">AI Evaluated</span>
+          </div>
+        </div>
+
+        <div class="two-col-grid">
+          <!-- Audit Log Table -->
+          <div class="glass-card">
+            <h3>🛡️ Live Audit Trail Logs</h3>
+            <p class="subtext">Immutable log of every user query, login, and authorization check.</p>
+            <div class="table-responsive" style="max-height: 380px; overflow-y: auto;">
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th>Timestamp</th>
+                    <th>Action</th>
+                    <th>Status</th>
+                    <th>User ID</th>
+                    <th>Details</th>
+                  </tr>
+                </thead>
+                <tbody id="auditLogsTableBody">
+                  <tr><td colspan="5" class="table-loading">Loading audit logs...</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- AI Security Analyzer -->
+          <div class="glass-card">
+            <h3>🤖 AI Security Anomaly Inspector</h3>
+            <p class="subtext">Run deterministic & AI-assisted access pattern anomaly reasoning.</p>
+            <div class="anomaly-controls">
+              <label for="anomalyUserSelect">Select User:</label>
+              <select id="anomalyUserSelect" class="form-select"></select>
+              <button class="primary-btn" id="btnRunSecurityAnalysis">Run AI Analysis</button>
+            </div>
+            <div class="anomaly-result-box" id="anomalyResultBox">
+              <div class="empty-state">Select a user to analyze security signals.</div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+
+      <!-- ================================================================= -->
+      <!-- TAB 6: MULTI-AGENT ARCHITECTURE & DIAGNOSTICS -->
+      <!-- ================================================================= -->
+      <section class="tab-content-panel" id="tab-architecture">
+        <div class="panel-header">
+          <div class="panel-title-group">
+            <div class="header-icon-box">⚡</div>
+            <div>
+              <h2>BizIQ Multi-Agent Architecture & Diagnostics</h2>
+              <p>System topology, HTTP REST contract boundaries, and real-time agent status.</p>
+            </div>
+          </div>
+          <div class="panel-actions">
+            <button class="primary-btn" id="btnPingAllAgents">⚡ Ping All 4 Agents</button>
+          </div>
+        </div>
+
+        <!-- Architecture Flowchart Card -->
+        <div class="glass-card architecture-card">
+          <h3>🏗️ System Architecture Topology</h3>
+          <div class="architecture-diagram">
+            <div class="arch-box user-box">
+              <span class="arch-icon">👤</span>
+              <strong>USER</strong>
+              <small>Natural Language Query</small>
+            </div>
+            <div class="arch-arrow">➔</div>
+            <div class="arch-box sec-box">
+              <span class="arch-icon">🔐</span>
+              <strong>Security Agent</strong>
+              <small>JWT Auth & RBAC</small>
+            </div>
+            <div class="arch-arrow">➔</div>
+            <div class="arch-box nlp-box">
+              <span class="arch-icon">🗣️</span>
+              <strong>NLP Query Agent</strong>
+              <small>Intent & NER Extraction</small>
+            </div>
+            <div class="arch-arrow">➔</div>
+            <div class="arch-box ir-box">
+              <span class="arch-icon">🔎</span>
+              <strong>IR Retrieval Agent</strong>
+              <small>TF-IDF & Cosine Ranking</small>
+            </div>
+            <div class="arch-arrow">➔</div>
+            <div class="arch-box insight-box">
+              <span class="arch-icon">🧠</span>
+              <strong>LLM Insight Agent</strong>
+              <small>Pandas, Holt & Grounding</small>
+            </div>
+            <div class="arch-arrow">➔</div>
+            <div class="arch-box resp-box">
+              <span class="arch-icon">✨</span>
+              <strong>EXPLAINABLE ANSWER</strong>
+              <small>Zero Hallucination</small>
+            </div>
+          </div>
+        </div>
+
+        <!-- Agent Status Diagnostics Grid -->
+        <div class="agent-diagnostics-grid" id="agentDiagnosticsGrid">
+          <div class="diag-card">
+            <h4>🗣️ NLP Query Agent (Member 1)</h4>
+            <div class="diag-status green">● Operational</div>
+            <p>Database: <code>biziq_nlp.db</code></p>
+            <p>Capabilities: Normalization, Intent classification, NER, Summarization</p>
+          </div>
+          <div class="diag-card">
+            <h4>🔎 Data Retrieval (IR) Agent (Member 2)</h4>
+            <div class="diag-status green">● Operational</div>
+            <p>Database: <code>datasources.db</code></p>
+            <p>Capabilities: TF-IDF indexing, Cosine similarity, Passage extraction</p>
+          </div>
+          <div class="diag-card">
+            <h4>🧠 LLM Insight Agent (Member 3)</h4>
+            <div class="diag-status green">● Operational</div>
+            <p>Database: <code>insights.db</code></p>
+            <p>Capabilities: Pandas stats, Holt forecasting, Chart.js specs, Verification</p>
+          </div>
+          <div class="diag-card">
+            <h4>🔐 Security & Compliance Agent (Member 4)</h4>
+            <div class="diag-status green">● Operational</div>
+            <p>Database: <code>security.db</code></p>
+            <p>Capabilities: JWT auth, RBAC permissions, Audit logging, AI anomaly detection</p>
+          </div>
+        </div>
+      </section>
+
+    </main>
+  </div>
+
+  <!-- Modals -->
+
+  <!-- Add Data Source Modal -->
+  <div class="modal-overlay hidden" id="datasourceModal">
+    <div class="modal-dialog">
+      <div class="modal-header">
+        <h3>📄 Add New Business Data Source</h3>
+        <button class="modal-close-btn" id="closeDatasourceModalBtn">✕</button>
+      </div>
+      <div class="modal-body">
+        <label for="dsNameInput">Data Source Name:</label>
+        <input type="text" id="dsNameInput" placeholder="e.g. Sales Ledger 2026">
+
+        <label for="dsTypeSelect">Source Type:</label>
+        <select id="dsTypeSelect" class="form-select">
+          <option value="csv">CSV (Tabular Analytics)</option>
+          <option value="text">Text (Document Knowledge)</option>
+        </select>
+
+        <label for="dsDescInput">Description:</label>
+        <input type="text" id="dsDescInput" placeholder="Brief summary of records...">
+
+        <label for="dsContentInput">Content (CSV or Text):</label>
+        <textarea id="dsContentInput" rows="7" placeholder="date,region,product,revenue..."></textarea>
+      </div>
+      <div class="modal-footer">
+        <button class="secondary-btn" id="cancelDatasourceBtn">Cancel</button>
+        <button class="primary-btn" id="saveDatasourceBtn">Save & Index</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Save Report Modal -->
+  <div class="modal-overlay hidden" id="saveReportModal">
+    <div class="modal-dialog">
+      <div class="modal-header">
+        <h3>📌 Save as Executive Report</h3>
+        <button class="modal-close-btn" id="closeReportModalBtn">✕</button>
+      </div>
+      <div class="modal-body">
+        <label for="reportTitleInput">Report Title:</label>
+        <input type="text" id="reportTitleInput" placeholder="e.g. Q3 Regional Performance Summary">
+
+        <label for="reportNotesInput">Executive Notes / Action Items:</label>
+        <textarea id="reportNotesInput" rows="4" placeholder="Key recommendations and decisions..."></textarea>
+      </div>
+      <div class="modal-footer">
+        <button class="secondary-btn" id="cancelReportBtn">Cancel</button>
+        <button class="primary-btn" id="confirmSaveReportBtn">Save Report</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Auth Modal -->
+  <div class="modal-overlay hidden" id="authModal">
+    <div class="modal-dialog">
+      <div class="modal-header">
+        <h3>🔐 User Authentication</h3>
+        <button class="modal-close-btn" id="closeAuthModalBtn">✕</button>
+      </div>
+      <div class="modal-body">
+        <div class="auth-tabs">
+          <button class="auth-tab-btn active" id="authTabLogin">Login</button>
+          <button class="auth-tab-btn" id="authTabRegister">Register</button>
+        </div>
+
+        <div id="authLoginForm">
+          <label for="loginEmail">Email:</label>
+          <input type="email" id="loginEmail" value="achini@biziq.com">
+
+          <label for="loginPassword">Password:</label>
+          <input type="password" id="loginPassword" value="Achini123!">
+
+          <button class="primary-btn full-width" id="doLoginBtn" style="margin-top: 15px;">Login with JWT</button>
+        </div>
+
+        <div id="authRegisterForm" class="hidden">
+          <label for="regFullName">Full Name:</label>
+          <input type="text" id="regFullName" placeholder="e.g. Jane Doe">
+
+          <label for="regUsername">Username:</label>
+          <input type="text" id="regUsername" placeholder="e.g. janedoe">
+
+          <label for="regEmail">Email:</label>
+          <input type="email" id="regEmail" placeholder="e.g. jane@company.com">
+
+          <label for="regPassword">Password:</label>
+          <input type="password" id="regPassword" placeholder="StrongPassword123">
+
+          <button class="primary-btn full-width" id="doRegisterBtn" style="margin-top: 15px;">Create Account</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast Notification Container -->
+  <div class="toast-container" id="toastContainer"></div>
+
+  <!-- Frontend Logic -->
+  <script src="app.js"></script>
+</body>
+</html>

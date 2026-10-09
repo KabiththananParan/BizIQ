@@ -5,9 +5,9 @@ from typing import Any
 import requests
 
 try:
-    from frontend.utils.config import API_BASE_URL, DEFAULT_TIMEOUT_SECONDS
+    from frontend.utils.config import API_BASE_URL, DEFAULT_TIMEOUT_SECONDS, SERVICE_TOKEN
 except ImportError:
-    from utils.config import API_BASE_URL, DEFAULT_TIMEOUT_SECONDS
+    from utils.config import API_BASE_URL, DEFAULT_TIMEOUT_SECONDS, SERVICE_TOKEN
 
 
 
@@ -56,9 +56,11 @@ class AgentValidationError(APIError):
 class SecurityAPIClient:
     """Client for BizIQ Security & Compliance Agent REST APIs."""
 
-    def __init__(self, base_url: str | None = None, timeout: int | None = None):
+    def __init__(self, base_url: str | None = None, timeout: int | None = None,
+                 service_token: str | None = SERVICE_TOKEN):
         self.base_url = (base_url or API_BASE_URL).rstrip("/")
         self.timeout = timeout or DEFAULT_TIMEOUT_SECONDS
+        self._service_token = service_token
 
     def _headers(self, token: str | None = None) -> dict[str, str]:
         headers = {"Content-Type": "application/json", "Accept": "application/json"}
@@ -255,7 +257,10 @@ class SecurityAPIClient:
             "metadata": metadata or {},
         }
         try:
-            response = requests.post(url, json=payload, headers=self._headers(token), timeout=self.timeout)
+            headers = self._headers(token)
+            if self._service_token:
+                headers["X-BizIQ-Service-Token"] = self._service_token
+            response = requests.post(url, json=payload, headers=headers, timeout=self.timeout)
             if response.status_code == 200:
                 return response.json()
             if response.status_code in (401, 403, 404):

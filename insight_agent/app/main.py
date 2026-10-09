@@ -4,9 +4,18 @@ from . import db, analytics, forecast as fc, llm, privacy, verify
 from .auth import User, can_access, get_current_user, require_role
 from .schemas import Feedback, InsightRequest, ReportCreate, ReportUpdate
 
+from fastapi.middleware.cors import CORSMiddleware
+
 app = FastAPI(title="BizIQ - LLM Insight Agent")
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 db.init_db()
-WRITE_ROLES = {"admin", "manager", "analyst"}
+WRITE_ROLES = {"admin", "manager", "analyst", "user"}
 DISCLAIMER = "AI-generated insight. Verify important decisions with the source data."
 
 
@@ -44,10 +53,14 @@ def generate_insight(req: InsightRequest, user: User = Depends(get_current_user)
     if not metric and not df.empty:
         nums = df.select_dtypes("number").columns
         metric = nums[0] if len(nums) else None
-    try:
-        stats = analytics.compute_stats(df, metric or "", sq.group_by, sq.date_column)
-    except ValueError as e:
-        raise HTTPException(422, str(e))
+    
+    stats = {}
+    if not df.empty:
+        try:
+            stats = analytics.compute_stats(df, metric or "", sq.group_by, sq.date_column)
+        except ValueError as e:
+            if not any(s.text for s in safe_sources):
+                raise HTTPException(422, str(e))
 
     forecast = None
     if sq.intent == "forecast" and "monthly" in stats:
