@@ -53,5 +53,9 @@ Open `http://127.0.0.1:8001/docs`.
 python -m pytest -q
 ```
 
-## Member 2 integration
-The IR Agent is expected at `http://127.0.0.1:8002` with `POST /retrieve`. The development token is configured in `app/services/config.py` and should later be replaced by the team's final authentication configuration.
+## Member 2 integration status
+The IR Agent development port is `8002`. Current source exposes `POST /search`,
+while this agent's client still posts to `/retrieve` with a different request
+shape. This mismatch is documented for the integration phase; this README does
+not imply the services currently interoperate. The NLP client token setting is
+`IR_AGENT_TOKEN`; IR reads `IR_API_TOKENS`.

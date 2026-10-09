@@ -53,12 +53,14 @@ class SecurityDashboardResponse(BaseModel):
 AgentName = Literal["nlp-agent", "ir-agent", "insight-agent", "security-agent"]
 SecurityOperation = Literal["QUERY_DATA", "RETRIEVE_DATA", "GENERATE_INSIGHT", "SECURITY_ANALYSIS"]
 SecurityValidationStatus = Literal[
-    "VALID", "DENIED", "INVALID_TOKEN", "INSUFFICIENT_PERMISSION", "INVALID_REQUEST"
+    "VALID", "DENIED", "INVALID_TOKEN", "INVALID_SERVICE_CREDENTIAL",
+    "SERVICE_AUTH_UNAVAILABLE", "SERVICE_NOT_AUTHORIZED", "INSUFFICIENT_PERMISSION",
+    "INVALID_REQUEST"
 ]
 
 
 class SecurityValidationRequest(BaseModel):
-    """Service-to-service request metadata and the end-user token to validate."""
+    """Caller and user claims; caller identity is verified from an HTTP credential."""
 
     request_id: str = Field(min_length=1, max_length=100)
     user_id: int = Field(gt=0)

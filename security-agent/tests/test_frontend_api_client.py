@@ -23,7 +23,9 @@ class FrontendAPIClientTestCase(unittest.TestCase):
     """Test suite for SecurityAPIClient error handling, status code mappings, and parameters."""
 
     def setUp(self) -> None:
-        self.client = SecurityAPIClient(base_url="http://test-server:8003", timeout=5)
+        self.client = SecurityAPIClient(
+            base_url="http://test-server:8003", timeout=5, service_token="test-service-token"
+        )
 
     @patch("requests.post")
     def test_login_success(self, mock_post: MagicMock) -> None:
@@ -213,7 +215,8 @@ class FrontendAPIClientTestCase(unittest.TestCase):
                 "operation": "SECURITY_ANALYSIS", "authorization_token": "session-jwt",
                 "metadata": {"request_type": "business_query"},
             },
-            headers={"Content-Type": "application/json", "Accept": "application/json", "Authorization": "Bearer session-jwt"},
+            headers={"Content-Type": "application/json", "Accept": "application/json",
+                     "Authorization": "Bearer session-jwt", "X-BizIQ-Service-Token": "test-service-token"},
             timeout=5,
         )
 

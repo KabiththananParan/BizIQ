@@ -1,7 +1,7 @@
 """Read-only deterministic security analysis API."""
 from datetime import datetime, timedelta, timezone
 from typing import Annotated
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, Header, HTTPException, status
 from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 from app.api.dependencies import require_permission
@@ -26,9 +26,13 @@ DB=Annotated[Session,Depends(get_db)]
 
 
 @router.post("/validate-request", response_model=SecurityValidationResponse)
-def validate_request(payload: SecurityValidationRequest, db: DB) -> JSONResponse:
-    """Validate an end-user JWT and RBAC request before another agent processes it."""
-    decision = validate_agent_request(db, payload)
+def validate_request(
+    payload: SecurityValidationRequest,
+    db: DB,
+    service_token: str | None = Header(default=None, alias="X-BizIQ-Service-Token"),
+) -> JSONResponse:
+    """Validate independent service credentials and end-user authorization."""
+    decision = validate_agent_request(db, payload, service_token)
     return JSONResponse(status_code=decision.status_code, content=decision.response.model_dump())
 
 @router.get("/dashboard", response_model=SecurityDashboardResponse)

@@ -7,9 +7,9 @@ Turns retrieved business data + a structured query into an explainable insight, 
 python -m venv venv && source venv/bin/activate      # Windows: venv\Scripts\activate
 pip install -r requirements.txt
 cp .env.example .env                                  # add LLM_API_KEY (optional - mock mode works without)
-uvicorn app.main:app --reload --port 8003
+uvicorn app.main:app --reload --port 8004
 ```
-Open http://localhost:8003/docs for the Swagger UI.  Run tests: `pytest -q`
+Open http://localhost:8004/docs for the Swagger UI. Run tests: `pytest -q`
 
 ## Endpoints
 | Method | Path | Purpose |

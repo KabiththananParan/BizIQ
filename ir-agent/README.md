@@ -45,7 +45,7 @@ ir-agent/
 | PUT | /datasources/{datasource_id} | Update a data source |
 | DELETE | /datasources/{datasource_id} | Delete a data source (204) |
 
-Interactive docs: http://127.0.0.1:8000/docs
+Interactive docs: http://127.0.0.1:8002/docs
 
 ## Setup
 Run from the `ir-agent/` folder:
@@ -53,7 +53,7 @@ Run from the `ir-agent/` folder:
 python -m venv .venv
 .venv\Scripts\activate
 pip install -r requirements.txt
-uvicorn app.main:app --reload
+uvicorn app.main:app --reload --port 8002
 ```
 
 ## Tests
